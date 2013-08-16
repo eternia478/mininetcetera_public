@@ -1,0 +1,75 @@
+from pox.core import core
+from pox.messenger import *
+from pox.lib.revent.revent import autoBindEvents
+
+"""def _process_mv_commands (msg):
+  if msg.get("channel",None):
+    host = msg.get("host") 
+    newsw = msg.get("newsw")
+    oldsw = msg.get("oldsw")
+"""
+
+class CMSBot (ChannelBot):
+##  def _init (self, extra):
+  def _unhandled (self, event):
+    print "4"
+    print "CMBot msg: ", event.msg
+    if event.msg.get("CHANNEL",'CMS'):
+      host = event.msg.get("host") 
+      print "host", host
+      in self.channel._members['CMS'].send(""):
+    
+      
+      
+      #newsw = msg.get("newsw")
+      #oldsw = msg.get("oldsw")
+      
+
+def launch (nexus = "MessengerNexus"):
+  def start (nexus):
+    real_nexus = core.components[nexus]
+    CMSBot(real_nexus.get_channel('CMS'))
+
+  core.call_when_ready(start, nexus, args=[nexus])
+  
+""" 
+If someone would handle the host change, another class should be created and in the init() should include:   
+    core.move_host.addListeners(self) 
+and in the class should include:
+    def _handle_LinkEvent (self, event)
+"""
+
+
+
+
+"""class MoveHandler (EventMixin):
+  _eventMixin_events = set([
+    MoveEvent,
+  ])
+  _core_name = "move_host"               
+  
+  def __init__(self,msg):
+  
+  
+  def _process_mv_commands (self, msg):
+  
+      r = msg.get("channel")
+      if r != "mnchannel":
+        return 
+      
+      host = msg.get("host")
+      print host
+      oldsw = msg.get("oldsw")
+      newsw = msg.get ("newsw")
+      intf = msg.get("intf")
+      self.raiseEventNoErrors(LinkEvent, True, event.link)
+      return  
+  
+class MoveEvent(Event):
+    def __init__(self, host, oldsw, newsw, intf):
+        Event.__init__(self)
+        self.host = host
+        self.oldsw = oldsw
+        self.newsw = newsw
+        self.intf = intf
+"""
