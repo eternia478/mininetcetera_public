@@ -1,3 +1,7 @@
+"""
+This file could connect to mininet_service.py, it is just a small test of the JSON and messenger
+"""
+
 import uuid
 import json
 import sys
