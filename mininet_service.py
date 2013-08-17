@@ -1,3 +1,8 @@
+"""
+This file could work with pox_mininet.py to receive msg sent from that file,, it is just a small test of the JSON and messenger
+"""
+
+
 from pox.core import core
 from pox.messenger import *
 from pox.lib.revent.revent import autoBindEvents
