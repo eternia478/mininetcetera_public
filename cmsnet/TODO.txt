@@ -21,7 +21,7 @@
   - do_add
   - do_cp
 6. Add aliases to cli.py (not important for now).
-7. Rewrite moveLink and such? (default interfaces when None?)
+7. [DONE] Rewrite moveLink and such? (default interfaces when None?)
 8. Figure out some stuff for the comp.py [This one is also a big task.]
   - Setting starting and stopping scripts for VMs
   - Enabling and disabling hypervisors (not complete right now). 
