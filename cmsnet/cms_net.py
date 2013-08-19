@@ -331,7 +331,7 @@ class CMSnet( object ):
             ip = self.controller_ip
             port = self.controller_port
             sock = socket.create_connection((ip, port))
-            self.controller_socket = socket
+            self.controller_socket = sock
         except Exception,e:
             warn("\nCannot connect to controller: %s\n" % str(e))
 
