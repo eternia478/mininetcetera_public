@@ -11,4 +11,6 @@ dist
 doc/html
 doc/latex
 trunk
+config/
+*.config_*
 
