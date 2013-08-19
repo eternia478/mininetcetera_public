@@ -704,14 +704,14 @@ class CMSnet( object ):
         
         return host
 
-    def _moveLink( self, node1, node2, intf1_name, intf2_name ):
+    def _moveLink( self, node1, node2, intf1_name=None, intf2_name=None ):
         """
         Move a host node to destination node in Mininet.
 
         node1: Moving node instance.
         node2: Destination node instance.
-        intf1_name: Moving node interface name.
-        intf2_name: Destination node interface name.
+        intf1_name: Moving node interface name. Default if None.
+        intf2_name: Destination node interface name. Default if None.
         """
         if self.debug_flag1:
             args = (node1, node2, intf1_name, intf2_name)
@@ -720,15 +720,17 @@ class CMSnet( object ):
         # Part 0: Main assertions.
         assert isinstance(node1, Host)
         assert isinstance(node2, Switch) or isinstance(node2, Dummy)
-        assert intf1_name in node1.nameToIntf
-        assert intf2_name not in node2.nameToIntf
+        assert not intf1_name or intf1_name in node1.nameToIntf
+        assert not intf2_name or intf2_name not in node2.nameToIntf
 
         # Part 1: Extracting intf1 information.
-        intf1 = node1.nameToIntf[intf1_name]
-        intf1_other = None
+        intf1 = node1.intf(intf=intf1_name)  # <- Uses defaultIntf if None.
+        assert intf1 is not None
+        intf1_name = intf1_name if intf1_name else intf1.name
         assert intf1.link != None
         assert intf1.link.intf1 == intf1 or intf1.link.intf2 == intf1
         assert intf1.node == node1
+        intf1_other = None
         if intf1.link.intf1 == intf1:
             intf1_other = intf1.link.intf2
         elif intf1.link.intf2 == intf1:
@@ -738,9 +740,10 @@ class CMSnet( object ):
         intf1_port_other = node1_other.ports[intf1_other]
 
         # Special case: Node already connected to other node.
-        if node1_other == node2 and intf1_name_other == intf2_name:
-            warn('connection already established\n')
-            return
+        if node1_other == node2:
+            if not intf2_name or intf2_name == intf1_name_other:
+                warn('connection already established\n')
+                return
 
         # Part 1.5: Call detach() on switch.
         if hasattr(node1_other, 'detach'):
@@ -752,10 +755,12 @@ class CMSnet( object ):
         del node1_other.intfs[ intf1_port_other ]
         del node1_other.ports[ intf1_other ]
         del node1_other.nameToIntf[ intf1_name_other ]
+        intf2_port = node2.newPort()          # For now, just assign new port.
         intf2 = intf1_other
+        if not intf2_name:
+            intf2_name = "%s-eth%d" % (node2.name, intf2_port)
         intf2.rename(intf2_name)
         intf2.node = node2
-        intf2_port = node2.newPort()          # For now, just assign new port.
         node2.intfs[ intf2_port ] = intf2
         node2.ports[ intf2 ] = intf2_port
         node2.nameToIntf[ intf2_name ] = intf2
@@ -770,12 +775,12 @@ class CMSnet( object ):
                 print "Attach %s to %s" % (intf2, node2)
             node2.attach(intf2)
 
-    def _removeLink( self, node, intf_name, remove_only_once=True ):
+    def _removeLink( self, node, intf_name=None, remove_only_once=True ):
         """
         Remove host node from topology in Mininet (link to dummy).
 
         node: Removed node instance.
-        intf_name: Removed node interface name.
+        intf_name: Removed node interface name. Default if None.
         remove_only_once: Invoke special case (not removing nodes on dummy).
         """
         if self.debug_flag1:
@@ -784,18 +789,22 @@ class CMSnet( object ):
 
         # Part 0: Main assertions.
         assert isinstance(node, Host)
-        assert intf_name in node.nameToIntf
+        assert not intf_name or intf_name in node.nameToIntf
 
         # Part 1: Getting dummy.
-        dummy = self.mn.nameToNode.get("dummy", None)
+        dummy = self.mn.nameToNode.get("dummy")
         if dummy is None:
             error('dummy node does not exist\n')
             return
         assert isinstance(dummy, Dummy)
 
+        # Part 1.5: Checking intf information.
+        intf = node.intf(intf=intf_name)  # <- Uses defaultIntf if None.
+        assert intf is not None
+        intf_name = intf_name if intf_name else intf.name
+
         # Special case: Node already connected to dummy.
         if remove_only_once:
-            intf = node.nameToIntf[intf_name]
             assert intf.link != None
             assert intf.link.intf1 == intf or intf.link.intf2 == intf
             assert intf.node != dummy
@@ -808,14 +817,14 @@ class CMSnet( object ):
         dummy_intf_name = 'dummy-eth' + str(dummy_intf_port)
         self._moveLink(node, dummy, intf_name, dummy_intf_name)
 
-    def _swapLink( self, node1, node2, intf1_name, intf2_name ):
+    def _swapLink( self, node1, node2, intf1_name=None, intf2_name=None ):
         """
         Swap position of two host nodes in Mininet.
 
         node1: First swapping node instance.
         node2: Second swapping node instance.
-        intf1_name: First swapping node interface name.
-        intf2_name: Second swapping node interface name.
+        intf1_name: First swapping node interface name. Default if None.
+        intf2_name: Second swapping node interface name. Default if None.
         """
         if self.debug_flag1:
             args = (node1, node2, intf1_name, intf2_name)
@@ -824,15 +833,17 @@ class CMSnet( object ):
         # Part 0: Main assertions.
         assert isinstance(node1, Host)
         assert isinstance(node2, Host)
-        assert intf1_name in node1.nameToIntf
-        assert intf2_name in node2.nameToIntf
+        assert not intf1_name or intf1_name in node1.nameToIntf
+        assert not intf2_name or intf2_name in node2.nameToIntf
 
         # Part 1: Extracting intf1 information.
-        intf1 = node1.nameToIntf[intf1_name]
-        intf1_other = None
+        intf1 = node1.intf(intf=intf1_name)  # <- Uses defaultIntf if None.
+        assert intf1 is not None
+        intf1_name = intf1_name if intf1_name else intf1.name
         assert intf1.link != None
         assert intf1.link.intf1 == intf1 or intf1.link.intf2 == intf1
         assert intf1.node == node1
+        intf1_other = None
         if intf1.link.intf1 == intf1:
             intf1_other = intf1.link.intf2
         elif intf1.link.intf2 == intf1:
@@ -841,11 +852,13 @@ class CMSnet( object ):
         intf1_name_other = intf1_other.name
 
         # Part 2: Extracting intf2 information.
-        intf2 = node2.nameToIntf[intf2_name]
-        intf2_other = None
+        intf2 = node2.intf(intf=intf2_name)  # <- Uses defaultIntf if None.
+        assert intf2 is not None
+        intf2_name = intf2_name if intf2_name else intf2.name
         assert intf2.link != None
         assert intf2.link.intf1 == intf2 or intf2.link.intf2 == intf2
         assert intf2.node == node2
+        intf2_other = None
         if intf2.link.intf1 == intf2:
             intf2_other = intf2.link.intf2
         elif intf2.link.intf2 == intf2:
@@ -961,14 +974,14 @@ class CMSnet( object ):
         
         return host
 
-    def moveLink( self, node1, node2, intf1_name, intf2_name ):
+    def moveLink( self, node1, node2, intf1_name=None, intf2_name=None ):
 """        """
         Move a host node to destination node in Mininet.
 
         node1: Moving node instance.
         node2: Destination node instance.
-        intf1_name: Moving node interface name.
-        intf2_name: Destination node interface name.
+        intf1_name: Moving node interface name. Default if None.
+        intf2_name: Destination node interface name. Default if None.
 """        """
         if self.debug_flag1:
             args = (node1, node2, intf1_name, intf2_name)
@@ -977,15 +990,17 @@ class CMSnet( object ):
         # Part 0: Main assertions.
         assert isinstance(node1, Host)
         assert isinstance(node2, Switch) or isinstance(node2, Dummy)
-        assert intf1_name in node1.nameToIntf
-        assert intf2_name not in node2.nameToIntf
+        assert not intf1_name or intf1_name in node1.nameToIntf
+        assert not intf2_name or intf2_name not in node2.nameToIntf
 
         # Part 1: Extracting intf1 information.
-        intf1 = node1.nameToIntf[intf1_name]
-        intf1_other = None
+        intf1 = node1.intf(intf=intf1_name)  # <- Uses defaultIntf if None.
+        assert intf1 is not None
+        intf1_name = intf1_name if intf1_name else intf1.name
         assert intf1.link != None
         assert intf1.link.intf1 == intf1 or intf1.link.intf2 == intf1
         assert intf1.node == node1
+        intf1_other = None
         if intf1.link.intf1 == intf1:
             intf1_other = intf1.link.intf2
         elif intf1.link.intf2 == intf1:
@@ -995,9 +1010,10 @@ class CMSnet( object ):
         intf1_port_other = node1_other.ports[intf1_other]
 
         # Special case: Node already connected to other node.
-        if node1_other == node2 and intf1_name_other == intf2_name:
-            warn('connection already established\n')
-            return
+        if node1_other == node2:
+            if not intf2_name or intf2_name == intf1_name_other:
+                warn('connection already established\n')
+                return
 
         # Part 1.5: Call detach() on switch.
         if hasattr(node1_other, 'detach'):
@@ -1009,10 +1025,12 @@ class CMSnet( object ):
         del node1_other.intfs[ intf1_port_other ]
         del node1_other.ports[ intf1_other ]
         del node1_other.nameToIntf[ intf1_name_other ]
+        intf2_port = node2.newPort()          # For now, just assign new port.
         intf2 = intf1_other
+        if not intf2_name:
+            intf2_name = "%s-eth%d" % (node2.name, intf2_port)
         intf2.rename(intf2_name)
         intf2.node = node2
-        intf2_port = node2.newPort()          # For now, just assign new port.
         node2.intfs[ intf2_port ] = intf2
         node2.ports[ intf2 ] = intf2_port
         node2.nameToIntf[ intf2_name ] = intf2
@@ -1027,12 +1045,12 @@ class CMSnet( object ):
                 print "Attach %s to %s" % (intf2, node2)
             node2.attach(intf2)
 
-    def removeLink( self, node, intf_name, remove_only_once=True ):
+    def removeLink( self, node, intf_name=None, remove_only_once=True ):
 """        """
         Remove host node from topology in Mininet (link to dummy).
 
         node: Removed node instance.
-        intf_name: Removed node interface name.
+        intf_name: Removed node interface name. Default if None.
         remove_only_once: Invoke special case (not removing nodes on dummy).
 """        """
         if self.debug_flag1:
@@ -1041,18 +1059,22 @@ class CMSnet( object ):
 
         # Part 0: Main assertions.
         assert isinstance(node, Host)
-        assert intf_name in node.nameToIntf
+        assert not intf_name or intf_name in node.nameToIntf
 
         # Part 1: Getting dummy.
-        dummy = self.nameToNode.get("dummy", None)
+        dummy = self.nameToNode.get("dummy")
         if dummy is None:
             error('dummy node does not exist\n')
             return
         assert isinstance(dummy, Dummy)
 
+        # Part 1.5: Checking intf information.
+        intf = node.intf(intf=intf_name)  # <- Uses defaultIntf if None.
+        assert intf is not None
+        intf_name = intf_name if intf_name else intf.name
+
         # Special case: Node already connected to dummy.
         if remove_only_once:
-            intf = node.nameToIntf[intf_name]
             assert intf.link != None
             assert intf.link.intf1 == intf or intf.link.intf2 == intf
             assert intf.node != dummy
@@ -1065,14 +1087,14 @@ class CMSnet( object ):
         dummy_intf_name = 'dummy-eth' + str(dummy_intf_port)
         self.moveLink(node, dummy, intf_name, dummy_intf_name)
 
-    def swapLink( self, node1, node2, intf1_name, intf2_name ):
+    def swapLink( self, node1, node2, intf1_name=None, intf2_name=None ):
 """        """
         Swap position of two host nodes in Mininet.
 
         node1: First swapping node instance.
         node2: Second swapping node instance.
-        intf1_name: First swapping node interface name.
-        intf2_name: Second swapping node interface name.
+        intf1_name: First swapping node interface name. Default if None.
+        intf2_name: Second swapping node interface name. Default if None.
 """        """
         if self.debug_flag1:
             args = (node1, node2, intf1_name, intf2_name)
@@ -1081,15 +1103,17 @@ class CMSnet( object ):
         # Part 0: Main assertions.
         assert isinstance(node1, Host)
         assert isinstance(node2, Host)
-        assert intf1_name in node1.nameToIntf
-        assert intf2_name in node2.nameToIntf
+        assert not intf1_name or intf1_name in node1.nameToIntf
+        assert not intf2_name or intf2_name in node2.nameToIntf
 
         # Part 1: Extracting intf1 information.
-        intf1 = node1.nameToIntf[intf1_name]
-        intf1_other = None
+        intf1 = node1.intf(intf=intf1_name)  # <- Uses defaultIntf if None.
+        assert intf1 is not None
+        intf1_name = intf1_name if intf1_name else intf1.name
         assert intf1.link != None
         assert intf1.link.intf1 == intf1 or intf1.link.intf2 == intf1
         assert intf1.node == node1
+        intf1_other = None
         if intf1.link.intf1 == intf1:
             intf1_other = intf1.link.intf2
         elif intf1.link.intf2 == intf1:
@@ -1098,11 +1122,13 @@ class CMSnet( object ):
         intf1_name_other = intf1_other.name
 
         # Part 2: Extracting intf2 information.
-        intf2 = node2.nameToIntf[intf2_name]
-        intf2_other = None
+        intf2 = node2.intf(intf=intf2_name)  # <- Uses defaultIntf if None.
+        assert intf2 is not None
+        intf2_name = intf2_name if intf2_name else intf2.name
         assert intf2.link != None
         assert intf2.link.intf1 == intf2 or intf2.link.intf2 == intf2
         assert intf2.node == node2
+        intf2_other = None
         if intf2.link.intf1 == intf2:
             intf2_other = intf2.link.intf2
         elif intf2.link.intf2 == intf2:
