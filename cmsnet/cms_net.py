@@ -413,16 +413,15 @@ class CMSnet( object ):
         assert vm_name not in self.nameToComp
 
         self.not_implemented()
-
-        """
         host = self._createHostAtDummy(vm_name)
-        # host = self.mn.createHostAtDummy(vm_name)
         vm = vm_cls(host, self.config_folder)
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm
-        """
+        
+        # return host
 
-    def launchVM( self, vm_name, hv_name=None ):
+
+    def launchVM( self, vm_name, hv_name ):
         "Initialize the created VM on a hypervisor."
         if self.debug_flag1:
             print "EXEC: launchVM(%s, %s):" % (vm_name, hv_name)
@@ -437,17 +436,33 @@ class CMSnet( object ):
         assert hv.is_enabled()
 
         self.not_implemented()
-
-        """
-        # FIXME get interfaces!!!
-        vm_intf_name = ""
-        hv_intf_name = ""
-
-        self.mn.moveLink(vm.node, hv.node, vm_intf_name, hv_intf_name)
-        vm.launch()   #FIXME: Need to change this.
-        # TODO: Change vm's attributes (or pass into launch)
-        """
-
+        
+        dummy = self.mn.nameToNode.get("dummy", None)
+        
+        for intf in vm.node.intfs.values():
+          if intf.link.intf1.node == dummy: 
+            vm_intf = intf
+            ## old_intf = intf.link.intf2
+            ## print "Old node is: ", old_intf.node
+                      
+          if intf.link.intf2.node == dummy:
+            vm_intf = intf 
+            ## old_intf = intf.link.intf1
+            ## print "Old node is: ", old_intf.node             
+        vm_intf_name =  intf.name
+        self._moveLink(vm.node, hv.node, vm_intf_name)
+        # print "New node is: ", old_intf.node
+        vm.launch(hv)  
+      
+        "Sending msg to comtroller"
+        msg = {
+          'CHANNEL' : 'CMS',
+          'host' : vm_name,
+          ## 'old_hv': old_intf.node.name,
+          'new_hv': hv_name
+        }      
+        self.controller_socket.send(json.dumps(msg))       
+        
     def migrateVM( self, vm_name, hv_name ):
         "Migrate a running image to another hypervisor."
         if self.debug_flag1:
@@ -463,15 +478,33 @@ class CMSnet( object ):
         assert hv.is_enabled()
 
         self.not_implemented()
+        
+          
+        for intf in vm.node.intfs.values():
+          if intf.link.intf1 == intf:
+            vm_intf = intf
+            ## old_intf = intf.link.intf2
+            ## print "Old node is: ", old_intf.node
+          if intf.link.intf2 == intf:
+            vm_intf = intf
+            ## old_intf = intf.link.intf1
+            ## print "Old node is: ", old_intf.node
+        
+        vm_intf_name = vm_intf.name
+        self._moveLink(vm.node, hv.node, vm_intf_name)
+        # print "New node is: ", old_intf.node
+        vm.moveTo(hv)
+        
+        "Sending msg to comtroller"
+        msg = {
+          'CHANNEL' : 'CMS',
+          'host' : vm_name,
+          ## 'old_hv':  old_intf.node.name,
+          'new_hv': hv_name
+        }
+        self.controller_socket.send(json.dumps(msg))       
 
-        """
-        # FIXME get interfaces!!!
-        vm_intf_name = ""
-        hv_intf_name = ""
-
-        self.mn.moveLink(vm.node, hv.node, vm_intf_name, hv_intf_name)
-        # TODO: Change vm's attributes
-        """
+       
 
     def stopVM( self, vm_name ):
         "Stop a running image."
@@ -484,15 +517,32 @@ class CMSnet( object ):
         assert vm.is_running()
 
         self.not_implemented()
-
-        """
-        # FIXME get interfaces!!!
-        vm_intf_name = ""
-        hv_intf_name = ""
-
-        vm.stop()   #FIXME: Need to change this.
-        self.mn.removeLink(vm.node, vm_intf_name)
-        """
+        
+        dummy = self.mn.nameToNode.get("dummy", None)
+        for intf in vm.node.intfs.values():
+          if intf.link.intf1 == intf:
+            vm_intf = intf
+            ## old_intf = intf.link.intf2
+            ## print "Old node is: ", old_intf.node
+          if intf.link.intf2 == intf:
+            vm_intf = intf
+            ## old_intf = intf.link.intf1
+            ## print "Old node is: ", old_intf.node
+        vm_intf_name = vm_intf.name
+        self._removeLink(vm.node, vm_intf_name)
+        vm.stop() 
+        
+        "Sending msg to comtroller"
+        msg = {
+          'CHANNEL' : 'CMS',
+          'host' : vm_name,
+          ## 'old_hv': old_node.name,
+          'new_hv': dummy.name,
+        }
+        self.controller_socket.send(json.dumps(msg))       
+        
+        
+       
 
     def deleteVM( self, vm_name ):
         "Remove the virtual machine image from the hypervisor."
