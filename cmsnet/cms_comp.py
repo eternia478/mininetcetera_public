@@ -108,7 +108,8 @@ class VirtualMachine( CMSComponent ):
 
         self.config_hv_name = None   # temp holder for HV name in config
         self.check_comp_config()
-        self.update_comp_config()
+        if not self.config_hv_name:  # Do not overwrite original running status
+            self.update_comp_config()
         self.have_comp_config = True
 
     @property
@@ -184,10 +185,13 @@ class VirtualMachine( CMSComponent ):
     def launch( self, hv ):
         "Initialize the VM on the input hypervisor."
         assert not self.is_running()
+        assert hv is not None
         assert hv.is_enabled()
 
         self.hv = hv
         self.hv.nameToVMs[self.name] = self
+
+        assert self.is_running()
 
         if self.have_comp_config:
             self.update_comp_config()
@@ -196,11 +200,14 @@ class VirtualMachine( CMSComponent ):
     def moveTo( self, hv ):
         "Migrate the VM to the new input hypervisor."
         assert self.is_running()
+        assert hv is not None
         assert hv.is_enabled()
 
         del self.hv.nameToVMs[self.name]
         self.hv = hv
         self.hv.nameToVMs[self.name] = self
+
+        assert self.is_running()
 
         if self.have_comp_config:
             self.update_comp_config()
@@ -211,6 +218,8 @@ class VirtualMachine( CMSComponent ):
 
         del self.hv.nameToVMs[self.name]
         self.hv = None
+
+        assert not self.is_running()
 
         if self.have_comp_config:
             self.update_comp_config()
