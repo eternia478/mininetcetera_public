@@ -97,7 +97,7 @@ from mininet.cli import CLI
 from mininet.log import info, warn, error, debug, output
 from mininet.node import Host, Switch#, POXNormalSwitch
 from mininet.link import Link, Intf
-from mininet.util import quietRun, fixLimits, numCores, ensureRoot
+from mininet.util import quietRun, fixLimits, numCores, ensureRoot, moveIntf
 from mininet.util import macColonHex, ipStr, ipParse, netParse, ipAdd
 from mininet.term import cleanUpScreens, makeTerms
 from mininet.net import Mininet
@@ -274,15 +274,15 @@ class CMSnet( object ):
         config["controller_port"] = self.controller_port
 
         topo = self.mn.topo
-        topo_opts = {}
         if topo:
+            topo_opts = {}
             topo_opts["hv_num"] = topo.hv_num
             topo_opts["fb_num"] = topo.fb_num
             topo_opts["hopts"] = topo.hopts
             topo_opts["sopts"] = topo.sopts
             topo_opts["lopts"] = topo.lopts
-        config["topo_cls"] = topo.__class__.__name__
-        config["topo_opts"] = topo_opts
+            config["topo_cls"] = topo.__class__.__name__
+            config["topo_opts"] = topo_opts
 
         f.write(json.dumps(config))
         f.flush()
@@ -360,7 +360,7 @@ class CMSnet( object ):
         for node_name in self.mn.nameToNode:
             node = self.mn.nameToNode[hv_name]
             if node.params.get("cms_type") == "hypervisor":
-                hv = hv_cls( node, self.config_folder)
+                hv = self.hv_cls( node, self.config_folder)
                 self.HVs.append(hv)
                 self.nameToComp[ node_name ] = hv
 

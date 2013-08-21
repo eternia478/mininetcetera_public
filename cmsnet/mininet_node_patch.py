@@ -95,7 +95,8 @@ class POXSwitch( Switch ):
 
         if 'POX_CORE_DIR' not in os.environ:
             #exit( 'exiting; please set missing POX_CORE_DIR env var' )
-            self.poxCoreDir = "~/pox"
+            self.poxCoreDir = "/home/mininet/pox"
+            warn("POX_CORE_DIR is not set.")
         else:
             self.poxCoreDir = os.environ[ 'POX_CORE_DIR' ]
 

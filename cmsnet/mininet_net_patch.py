@@ -1,5 +1,11 @@
 
 
+# REMEMBER TO ALSO IMPORT THIS IN MININET LATER SINCE MOVELINK USES THIS:
+from mininet.util import moveIntf
+
+
+
+
 class MininetPatch(object):
     """
     NOTE: Please move the below code into Mininet. The code directly
