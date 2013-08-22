@@ -185,7 +185,7 @@ class VirtualMachine( CMSComponent ):
                         setattr(self, attr, config[attr])
                 f.close()                
         except IOError as e:
-            info("No config exists for VM %s" % self.name)
+            info("No config exists for VM %s\n" % self.name)
 
     def update_comp_config( self ):
         "Update the configurations for this component."

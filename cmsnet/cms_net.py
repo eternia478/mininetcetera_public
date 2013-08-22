@@ -712,7 +712,7 @@ class CMSnet( object ):
         #     self.buildFromTopo( self.topo )
         info( '*** Adding host: %s\n' % hostName )
         host = self.mn.addHost( hostName )
-        info( '*** Adding link: (%s, %s) ' % ( host.name, dummy.name ) )
+        info( '*** Adding link: (%s, %s)\n' % ( host.name, dummy.name ) )
         hostPort = host.newPort()
         dummyPort = dummy.newPort()
         self.mn.addLink( host, dummy, hostPort, dummyPort )
