@@ -1,8 +1,8 @@
 1. Finish main functions in net.py
-  - createVM
-  - launchVM
-  - migrateVM
-  - stopVM
+  - [DONE] createVM
+  - [DONE] launchVM
+  - [DONE] migrateVM
+  - [DONE] stopVM
   - cloneVM
 2. Clean up get_hypervisors and other beta stuff in net.py
 3. Implement VM distribution modes. [This one is maybe a big task.]
@@ -17,10 +17,10 @@
        Mininet itself shuts down. I doubt we can just shut the entire
        thing down and there is no way to access it beforehand. Maybe
        we should have CMSComponents see this item (or just the VM).
-5. Add the extra functionalities in cli.py
+5. Add the extra functionalities in cli.py (has to do with scripts)
   - do_add
   - do_cp
-6. Add aliases to cli.py (not important for now).
+6. [DONE] Add aliases to cli.py (not important for now).
 7. [DONE] Rewrite moveLink and such? (default interfaces when None?)
 8. Figure out some stuff for the comp.py [This one is also a big task.]
   - Setting starting and stopping scripts for VMs
