@@ -22,7 +22,7 @@ if 'PYTHONPATH' in os.environ:
 print "PYTHONPATH   = %s" % os.environ.get( 'PYTHONPATH' )
 print "POX_CORE_DIR = %s" % os.environ.get( 'POX_CORE_DIR' )
 
-from mininet.clean import cleanup
+#from mininet.clean import cleanup
 #from mininet.cli import CLI
 from mininet.log import lg, LEVELS, info, debug, error
 from mininet.net import Mininet, MininetWithControlNet, VERSION
@@ -41,6 +41,7 @@ from cmsnet.cms_comp import VirtualMachine, Hypervisor
 from cmsnet.mininet_node_patch import POXSwitch, POXNormalSwitch, Dummy
 from cmsnet.cms_net import CMSnet
 from cmsnet.cms_cli import CMSCLI
+from cmsnet.mininet_clean_patch import cleanup
 
 # built in topologies, created only when run
 # Changed
