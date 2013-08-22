@@ -358,7 +358,7 @@ class CMSnet( object ):
         # HV don't need loading. Just attach to switch.
         # Default? In case added more nodes after topo...
         for node_name in self.mn.nameToNode:
-            node = self.mn.nameToNode[hv_name]
+            node = self.mn.nameToNode[node_name]
             if node.params.get("cms_type") == "hypervisor":
                 hv = self.hv_cls( node, self.config_folder)
                 self.HVs.append(hv)
