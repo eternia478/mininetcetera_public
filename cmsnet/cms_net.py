@@ -291,7 +291,7 @@ class CMSnet( object ):
     def get_hypervisors( self ):
         "Collect all hypervisors."
         # HV don't need loading. Just attach to switch.
-        if not self.vm_dist_mode:
+        if self.vm_dist_mode:
             self.get_hypervisors_beta()
             return
         if self.mn.topo is not None:
