@@ -141,6 +141,19 @@ class VirtualMachine( CMSComponent ):
     def hv( self ):
         return self._hv
 
+    @hv.setter
+    def hv( self, hv ):
+        if self._hv:
+            del self._hv.nameToVMs[self.name]
+        self._hv = hv
+        if self._hv:
+            self._hv.nameToVMs[self.name] = self
+            assert self.is_running()
+        else:
+            assert not self.is_running()
+        if self._have_comp_config:
+            self.update_comp_config()
+
     @property
     def hv_name( self ):
         if isinstance(self.hv, Hypervisor):
@@ -201,14 +214,7 @@ class VirtualMachine( CMSComponent ):
         assert not self.is_running()
         assert hv is not None
         assert hv.is_enabled()
-
-        self._hv = hv
-        self._hv.nameToVMs[self.name] = self
-
-        assert self.is_running()
-
-        if self._have_comp_config:
-            self.update_comp_config()
+        self.hv = hv
         self.node.cmd(self.start_script)
 
     def moveTo( self, hv ):
@@ -216,27 +222,12 @@ class VirtualMachine( CMSComponent ):
         assert self.is_running()
         assert hv is not None
         assert hv.is_enabled()
-
-        del self._hv.nameToVMs[self.name]
-        self._hv = hv
-        self._hv.nameToVMs[self.name] = self
-
-        assert self.is_running()
-
-        if self._have_comp_config:
-            self.update_comp_config()
+        self.hv = hv
 
     def stop( self ):
         "Stop running the VM."
         assert self.is_running()
-
-        del self._hv.nameToVMs[self.name]
-        self._hv = None
-
-        assert not self.is_running()
-
-        if self._have_comp_config:
-            self.update_comp_config()
+        self.hv = None
         self.node.cmd(self.stop_script)
 
     def shutdown( self ):
