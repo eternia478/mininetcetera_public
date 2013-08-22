@@ -62,8 +62,7 @@ class CMSComponent( object ):
         except:
             pass
         self.node.name = name
-        if self._have_comp_config:
-            self.update_comp_config()
+        self.update_comp_config()
 
     def __repr__( self ):
         "More informative string representation"
@@ -113,9 +112,9 @@ class VirtualMachine( CMSComponent ):
 
         self.config_hv_name = None   # temp holder for HV name in config
         self.check_comp_config()
+        self._have_comp_config = True
         if not self.config_hv_name:  # Do not overwrite original running status
             self.update_comp_config()
-        self._have_comp_config = True
 
     @property
     def IP( self ):
@@ -124,8 +123,7 @@ class VirtualMachine( CMSComponent ):
     @IP.setter
     def IP( self, ip ):
         self.node.setIP(ip)
-        if self._have_comp_config:
-            self.update_comp_config()
+        self.update_comp_config()
 
     @property
     def MAC( self ):
@@ -134,8 +132,7 @@ class VirtualMachine( CMSComponent ):
     @MAC.setter
     def MAC( self, mac ):
         self.node.setMAC(mac)
-        if self._have_comp_config:
-            self.update_comp_config()
+        self.update_comp_config()
 
     @property
     def hv( self ):
@@ -151,8 +148,7 @@ class VirtualMachine( CMSComponent ):
             assert self.is_running()
         else:
             assert not self.is_running()
-        if self._have_comp_config:
-            self.update_comp_config()
+        self.update_comp_config()
 
     @property
     def hv_name( self ):
@@ -193,6 +189,8 @@ class VirtualMachine( CMSComponent ):
 
     def update_comp_config( self ):
         "Update the configurations for this component."
+        if not self._have_comp_config:
+            return
         f = open(self.get_config_file_name(), "w")
         config = {}
         config["IP"] = self.IP
