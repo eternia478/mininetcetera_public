@@ -96,7 +96,7 @@ class VirtualMachine( CMSComponent ):
 
     vm_uuid = 0  # UNUSED: For ID purposes? Maybe name is enough.
 
-    def __init__( self, node, config_folder="." ):
+    def __init__( self, node, config_folder=".", tenant_id=1 ):
         """
         Intialization
 
@@ -109,6 +109,7 @@ class VirtualMachine( CMSComponent ):
         self._hv = None
         self.start_script = ""   # CHECK: Should these be modifiable?
         self.stop_script = ""
+        self._tenant_id = tenant_id
 
         self.config_hv_name = None   # temp holder for HV name in config
         self.check_comp_config()
@@ -146,6 +147,10 @@ class VirtualMachine( CMSComponent ):
             return self.hv.name
         return None
 
+    @property
+    def tenant_id( self ):
+        return self._tenant_id
+
     def __repr__( self ):
         "More informative string representation"
         # TODO: This should be different.
@@ -182,6 +187,7 @@ class VirtualMachine( CMSComponent ):
         config["start_script"] = self.start_script
         config["stop_script"] = self.stop_script
         config["config_hv_name"] = self.hv_name
+        config["_tenant_id"] = self._tenant_id
         f.write(json.dumps(config))
         f.flush()
         f.close()
