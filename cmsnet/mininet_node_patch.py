@@ -264,6 +264,6 @@ class POXNormalSwitch( POXSwitch ):
     def __init__( self, name, **params):
         params.update({"inNamespace":True})
         POXSwitch.__init__(self, name, control_flag=True,
-                           control_type="forwarding.l2_pairs", **params)
+                           control_type="forwarding.hub", **params)
 
 
