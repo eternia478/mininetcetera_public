@@ -360,5 +360,5 @@ if __name__ == "__main__":
         # Print stack trace to debug log
         import traceback
         stackTrace = traceback.format_exc()
-        debug( stackTrace + "\n" )
+        error( stackTrace + "\n" )
         cleanup()
