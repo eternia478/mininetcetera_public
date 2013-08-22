@@ -412,6 +412,30 @@ class CMSCLI( Cmd ):
             self.cn.disableHV(hv_name)
 
 
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS Main Command Aliases
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
+    def do_create( self, line ):
+        self.do_add(line)
+
+    def do_start( self, line ):
+        self.do_launch(line)
+
+    def do_migrate( self, line ):
+        self.do_mv(line)
+
+    def do_move( self, line ):
+        self.do_mv(line)
+
+    def do_delete( self, line ):
+        self.do_rm(line)
+
+    def do_clone( self, line ):
+        self.do_cp(line)
+
+
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
     #
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
