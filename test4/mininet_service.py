@@ -9,12 +9,19 @@ from pox.lib.revent.revent import autoBindEvents
 
 class CMSBot (ChannelBot):
   def _unhandled (self, event):
-    print "4"
-    print "CMBot msg: ", event.msg
+    print "4" 
+    # print "CMBot msg: ", event.msg
     if event.msg.get("CHANNEL",'CMS'):
-    #TODO: Here we could get the useful information and do what we need do here
-      host = event.msg.get("host") 
-      print "host", host
+      msglevel = event.msg.get("msglevel")
+      msgtype = event.msg.get("type")
+      if msgtype == msglevel or msglevel == None:
+        print "CMBot msg: ", event.msg
+        host = event.msg.get("host") 
+        print "host", host
+        
+    # TODO: Here we could get the useful information and do what we need do here
+    # host = event.msg.get("host") 
+    # print "host", host
 
 def launch (nexus = "MessengerNexus"):
   def start (nexus):

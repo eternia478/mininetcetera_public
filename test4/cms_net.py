@@ -35,11 +35,12 @@ VERSION = "2.0.0.i.x.beta"
 
 class CMSnet( object ):
     "Network emulation with hosts spawned in network namespaces."
-
+    # @GLY
     def __init__( self, vm_dist_mode="random",vm_dist_limit=10,
                   new_config=False, config_folder=".",
                   net_cls=Mininet, vm_cls=VirtualMachine, hv_cls=Hypervisor,
-                  controller_ip="127.0.0.1", controller_port=7790, **params):
+                  controller_ip="127.0.0.1", controller_port=7790, msglevel =
+                  "instantiated", **params):
         """Create Mininet object.
            vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
            new_config: True if we are using brand new configurations.
@@ -65,6 +66,10 @@ class CMSnet( object ):
         self.controller_socket = None
         self.possible_modes = ["packed", "sparse", "random"]
         
+        # @GLY
+        self.msglevel = msglevel
+        self.possible_level = {"instantiated","migrated","destroyed"}
+
         
             
         if not new_config:
@@ -213,6 +218,8 @@ class CMSnet( object ):
         config["hv_cls"] = self.hv_cls.__name__
         config["controller_ip"] = self.controller_ip
         config["controller_port"] = self.controller_port
+        # @GLY
+        config["msglevel"] = self.msglevel
 
         topo = self.mn.topo
         
@@ -450,10 +457,12 @@ class CMSnet( object ):
         
         # print "New node is: ", old_intf.node
         vm.launch(hv)  
-      
+        # @GLY
         "Sending msg to comtroller"
         msg = {
           'CHANNEL' : 'CMS',
+          'msglevel': self.msglevel,
+          'type' : 'instantiated',
           'host' : vm_name,
            #'old_hv': old_intf.node.name,
           'new_hv': hv_name
@@ -495,9 +504,12 @@ class CMSnet( object ):
         # print "New node is: ", old_intf.node
         vm.moveTo(hv)
         
+        # @GLY
         "Sending msg to comtroller"
         msg = {
           'CHANNEL' : 'CMS',
+          'type' : 'migrated',
+          'msglevel': self.msglevel,
           'host' : vm_name,
           ## 'old_hv':  old_intf.node.name,
           'new_hv': hv_name
@@ -537,9 +549,12 @@ class CMSnet( object ):
         print "new link: ", vm_intf.link
         vm.stop() 
         
+        # @GLY
         "Sending msg to comtroller"
         msg = {
           'CHANNEL' : 'CMS',
+          'type' : 'destroyed',
+          'msglevel': self.msglevel,
           'host' : vm_name,
           ## 'old_hv': old_node.name,
           'new_hv': dummy.name,
@@ -611,7 +626,18 @@ class CMSnet( object ):
         if (vm_dist_mode =="packed") and  vm_dist_limit:
           self.vm_dist_limit = vm_dist_limit
         
+    # @GLY
+    def changeLevel( self, msglevel):
+        "Change the msglevel."
+        if self.debug_flag1:
+            print "EXEC: changeLevel(%s):" % msglevel
 
+        assert msglevel in self.possible_level
+
+        self.msglevel = msglevel
+        self.update_net_config()
+       
+          
     def enableHV( self, hv_name ):  ##???
         "Enable a hypervisor."
         if self.debug_flag1:
