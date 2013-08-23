@@ -388,13 +388,51 @@ class CMSnet( object ):
         vm = self.vm_cls(host, self.config_folder)
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm
-        
-        
-        
-        
         return host
+    
+    # @GLY
+    def cloneVM (self, vm_name, new_name = None, cls = None, **params ):
+        "Create a virtual machine image."
+        if self.debug_flag1:
+            print "EXEC: cloneVM(%s):" % vm_name
+        assert vm_name in self.nameToComp
+        assert new_name not in self.nameToComp
+        vm_old = self.nameToComp.get(vm_name)
+        assert isinstance(vm_old, VirtualMachine)
+        
+        # self.not_implemented()
+        if new_name == None:          
+            new_name = vm_name + '.cp'
+            while new_name in self.nameToComp:
+                new_name = new_name + '.cp'
+              
+        else:
+            if new_name in self.nameToComp:
+                return "ERROR: name has existed already"  
+        print new_name           
+        host = self.createVM(new_name, cls = cls, **params)
+        # @GLY
+        vm_new = self.vm_cls(host, self.config_folder)
+        vm_old = self.nameToComp.get(vm_name)
+        vm_old.cloneto(vm_new)
+        return host
+    
+    
+    """    
+    def cloneVM( self, vm1_name, vm2_name ):
+        "Clone a virtual machine image."
+        if self.debug_flag1:
+            print "EXEC: cloneVM(%s):" % vm_name
 
+        assert vm1_name in self.nameToComp
+        assert vm2_name not in self.nameToComp
+        vm1 = self.nameToComp.get(vm1_name)
+        assert isinstance(vm1, VirtualMachine)
 
+        self.not_implemented()
+    """        
+    
+    
     def launchVM( self, vm_name, hv_name= None ):
         "Initialize the created VM on a hypervisor."
         if self.debug_flag1:
@@ -599,7 +637,7 @@ class CMSnet( object ):
 
         # TODO: Remove file!
         """
-        
+    """    
     def cloneVM( self, vm1_name, vm2_name ):
         "Clone a virtual machine image."
         if self.debug_flag1:
@@ -611,7 +649,7 @@ class CMSnet( object ):
         assert isinstance(vm1, VirtualMachine)
 
         self.not_implemented()
-        
+    """    
 
     def changeVMDistributionMode( self, vm_dist_mode, vm_dist_limit = None ):
         "Change the mode of VM distribution across hypervisors."
@@ -964,7 +1002,6 @@ class CMSnet( object ):
         self._removeLink(node1, intf1_name, remove_only_once=False)
         self._moveLink(node2, node1_other, intf2_name, intf1_name_other)
         self._moveLink(node1, node2_other, intf1_name, intf2_name_other)
-
 
 
 
