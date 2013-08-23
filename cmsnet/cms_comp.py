@@ -116,6 +116,14 @@ class VirtualMachine( CMSComponent ):
         if not self.config_hv_name:  # Do not overwrite original running status
             self.update_comp_config()
 
+    @CMSComponent.name.setter
+    def name( self, name ):
+        old_name = self.name
+        CMSComponent.name.fset(self, name)
+        if self._hv:
+            del self._hv.nameToVMs[old_name]
+            self._hv.nameToVMs[self.name] = self
+
     @property
     def IP( self ):
         return self.node.IP()
@@ -240,7 +248,7 @@ class Hypervisor( CMSComponent ):
     """A hypervisor that virtual machines run on. A wrapper class for the
        Switch class."""
 
-    def __init__( self, node, config_folder="." , vm_limit = None):
+    def __init__( self, node, config_folder=".", vm_dist_limit=None):
         """
         Intialization
 
@@ -252,10 +260,26 @@ class Hypervisor( CMSComponent ):
 
         self.nameToVMs = {}   # UNUSED: mapping for VMs in this hypervisor
         self._enabled = True
-        if vm_limit == None:
-            self.vm_limit = 10
-        else:
-            self.vm_limit = vm_limit
+        self._vm_dist_limit = vm_dist_limit
+
+        self.check_comp_config()
+        self._have_comp_config = True
+        self.update_comp_config()
+
+    @CMSComponent.name.setter
+    def name( self, name ):
+        CMSComponent.name.fset(self, name)
+        for vm in self.nameToVMs.values():
+            vm.update_comp_config()
+
+    @property
+    def vm_dist_limit( self ):
+        return self._vm_dist_limit
+
+    @vm_dist_limit.setter
+    def vm_dist_limit( self, vm_dist_limit ):
+        self._vm_dist_limit = vm_dist_limit
+        self.update_comp_config()
 
     def __repr__( self ):
         "More informative string representation"
@@ -266,6 +290,20 @@ class Hypervisor( CMSComponent ):
         "Return the file name of the configuration file."
         return self._config_folder+"/"+self.name+".config_hv"
 
+    def check_comp_config( self ):
+        "Check for any previous configurations and adjust if necessary."
+        # TODO: Implement me.
+        pass
+
+    def update_comp_config( self ):
+        "Update the configurations for this component."
+        # TODO: Implement me.
+        pass
+
+    def get_num_VMs( self ):
+        "Return the number of VMs running on this hypervisor."
+        return len(self.nameToVMs)
+
     def is_enabled( self ):
         "Test if this hypervisor is enabled to run VMs or not."
         return self._enabled
@@ -274,11 +312,13 @@ class Hypervisor( CMSComponent ):
         "Enable the hypervisor to run VMs."
         assert not self.is_enabled()
         self._enabled = True
+        self.update_comp_config()
 
     def disable( self ):
         "Disable the hypervisor from running VMs."
         assert self.is_enabled()
         self._enabled = False
+        self.update_comp_config()
 
 
 
