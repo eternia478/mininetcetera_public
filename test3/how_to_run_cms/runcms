@@ -1,0 +1,15 @@
+#!/bin/bash
+
+PYTHONPATH2=
+PYTHONPATH=/home/mininet/mininetcetera/
+POX_CORE_DIR=/home/mininet/pox/
+CONFIG_FOLDER_LOCATION=.
+
+
+
+cd $CONFIG_FOLDER_LOCATION
+mkdir config 2> /dev/null
+cd config
+
+sudo env PYTHONPATH=$PYTHONPATH POX_CORE_DIR=$POX_CORE_DIR $PYTHONPATH/bin/cms $@
+
