@@ -34,6 +34,7 @@ import time
 from mininet.log import info, output, error
 from mininet.term import makeTerms, runX11
 from mininet.util import quietRun, isShellBuiltin, dumpNodeConnections
+from mininet.util import checkInt
 
 from cmsnet.cms_comp import VirtualMachine, Hypervisor
 
@@ -366,18 +367,38 @@ class CMSCLI( Cmd ):
         "Change the mode of VM distribution across hypervisors."
         args = line.split()
         vm_dist_mode = None
+        vm_dist_limit = None
 
+        if len(args) == 0:
+            out_str = "vm_dist_mode: %s" % self.cn.vm_dist_mode
+            if self.cn.vm_dist_mode == "packed":
+                out_str += "\tvm_dist_limit: %s" % self.cn.vm_dist_limit
+            output(out_str+"\n")
+            return
         if len(args) == 1:
             vm_dist_mode = args[0]
+        elif len(args) == 2:
+            vm_dist_mode = args[0]
+            if not checkInt(args[1]):
+                error('second argument not an integer: %s\n' % args[1])
+                return
+            vm_dist_limit = int(args[1])
         else:
-            error('invalid number of args: mode vm_dist_mode\n')
+            error('invalid number of args: mode [dist_mode [dist_limit]]\n')
             return
 
-        if vm_dist_mode not in self.cn.possible_modes:  # TODO: FIXME
+        if vm_dist_mode not in self.cn.possible_modes:
             error('No such VM distribution mode: %s\n' % vm_dist_mode)
             return
+        if vm_dist_limit is not None:
+            if vm_dist_mode != "packed":
+                error('Mode %s should not have limit\n' % vm_dist_mode)
+                return
+            if vm_dist_limit <= 0:
+                error('Invalid capacity limit: %s\n' % vm_dist_limit)
+                return
 
-        self.cn.changeVMDistributionMode(vm_dist_mode)
+        self.cn.changeVMDistributionMode(vm_dist_mode, vm_dist_limit)
 
     def do_enable( self, line ):
         "Enable a hypervisor."
