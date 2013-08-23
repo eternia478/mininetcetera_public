@@ -565,6 +565,32 @@ class CMSnet( object ):
 
         return vm
 
+    def cloneVM (self, vm_name, new_name = None, cls = None, **params ):
+        "Create a virtual machine image."
+        if self.debug_flag1:
+            print "EXEC: cloneVM(%s):" % vm_name
+        assert vm_name in self.nameToComp
+        assert new_name not in self.nameToComp
+        vm_old = self.nameToComp.get(vm_name)
+        assert isinstance(vm_old, VirtualMachine)
+        
+        # self.not_implemented()
+        if new_name == None:          
+            new_name = vm_name + '.cp'
+            while new_name in self.nameToComp:
+                new_name = new_name + '.cp'
+              
+        else:
+            if new_name in self.nameToComp:
+                return "ERROR: name has existed already"  
+        print new_name           
+        host = self.createVM(new_name, cls = cls, **params)
+        # @GLY
+        vm_new = self.vm_cls(host, self.config_folder)
+        vm_old = self.nameToComp.get(vm_name)
+        vm_old.cloneto(vm_new)
+        return host
+
     def launchVM( self, vm_name, hv_name=None ):
         "Initialize the created VM on a hypervisor."
         if self.debug_flag1:
@@ -659,18 +685,6 @@ class CMSnet( object ):
 
         # TODO: Remove file!
         """
-        
-    def cloneVM( self, vm1_name, vm2_name ):
-        "Clone a virtual machine image."
-        if self.debug_flag1:
-            print "EXEC: cloneVM(%s):" % vm_name
-
-        assert vm1_name in self.nameToComp
-        assert vm2_name not in self.nameToComp
-        vm1 = self.nameToComp.get(vm1_name)
-        assert isinstance(vm1, VirtualMachine)
-
-        self.not_implemented()
 
     def changeVMDistributionMode( self, vm_dist_mode, vm_dist_limit=None ):
         "Change the mode of VM distribution across hypervisors."

@@ -215,6 +215,12 @@ class VirtualMachine( CMSComponent ):
         "Test if this VM image is running (or inactive) on any hypervisor."
         return self.hv_name is not None
 
+    def cloneto (self, vm_new):
+        "clone the tenant ID and scripts"
+        vm_new.start_script = self.start_script
+        vm_new.stop_script = self.stop_script
+        vm_new.tenentID = self.tenentID   
+
     def launch( self, hv ):
         "Initialize the VM on the input hypervisor."
         assert not self.is_running()
