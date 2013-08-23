@@ -434,13 +434,15 @@ class CMSnet( object ):
     def getPossibleVMDistModes( cls ):
         "Dynamically obtain all possible VM distribution mode names."
         vm_dist_prefix = "_vm_dist_"
-        method_list = cls.__dict__  # dir(cls)
-        get_prefix = lambda method: method[:len(vm_dist_prefix)]
-        get_suffix = lambda method: method[len(vm_dist_prefix):]
-        is_dist_mode = lambda method: get_prefix(method) == vm_dist_prefix
-        
-        dist_mode_method_names = filter(is_dist_mode, method_list)
-        dist_mode_names = map(get_suffix, dist_mode_method_names)
+        method_list = dir(cls)   #cls.__dict__  # dir(cls)
+        dist_mode_names = []
+        for method in method_list:
+            if method.startswith(vm_dist_prefix):
+                mode_name = method[len(vm_dist_prefix):]
+                dist_mode_names.append( mode_name )
+        #get_mode_name = lambda method: method[len(vm_dist_prefix):]
+        #is_dist_mode = lambda method: method.startswith(vm_dist_prefix)
+        #dist_mode_names =map(get_mode_name, filter(is_dist_mode, method_list))
         return dist_mode_names
 
     def isHVFull( self, hv ):
