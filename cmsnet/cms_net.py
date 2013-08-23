@@ -123,12 +123,13 @@ VERSION = "2.0.0.i.x.beta"
 class CMSnet( object ):
     "Network emulation with hosts spawned in network namespaces."
 
-    def __init__( self, vm_dist_mode="random",vm_dist_limit=10,
+    def __init__( self, vm_dist_mode="random", vm_dist_limit=10,
                   new_config=False, config_folder=".",
                   net_cls=Mininet, vm_cls=VirtualMachine, hv_cls=Hypervisor,
                   controller_ip="127.0.0.1", controller_port=7790, **params):
         """Create Mininet object.
            vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
+           vm_dist_limit: Limit of number of VMs on hypervisors in packed mode
            new_config: True if we are using brand new configurations.
            config_folder: Folder where configuration files are saved/loaded.
            net_cls: Mininet class.
@@ -151,7 +152,9 @@ class CMSnet( object ):
         self.HVs = []
         self.nameToComp = {}   # name to CMSComponent (VM/HV) objects
         self.controller_socket = None
-        self.possible_modes = ["packed", "sparse", "random"]
+        #self.possible_modes = ["packed", "sparse", "random"]
+        self.possible_modes = self.getPossibleVMDistModes()
+        self.last_HV = None
 
         if not new_config:
             self.check_net_config()
@@ -391,36 +394,49 @@ class CMSnet( object ):
         params.update({"cms_net": "fabric", "cls": POXNormalSwitch})
         return self.mn.addSwitch(name, **params)
 
+
+
+
+
+
+
+  
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS VM Distribution Mode Handling
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
     def _getNextDefaultHVName( self ):
         "Using the distribution mode, get the next default hv_name"
-        if len(self.HVs) > 0:
-            error("\nCannot get hv_name: No hypervisor exists.\n")
+        if len(self.HVs) == 0:
+            error_msg = "No hypervisor exists"
+            error("\nCannot get hv_name: %s.\n" % error_msg)
             return
-
-        if self.vm_dist_mode == 'random':
-            hv_name = random.choice(self.HVs).name
-        elif self.vm_dist_mode == 'sparse':
-            min_hv = min(self.HVs, key=lambda hv: len(hv.nameToVMs))
-            hv_name = min_hv.name
-        elif self.vm_dist_mode == 'packed':
-            # hv_name = self._efficientPackedDistMode()
-            avail_hvs = [hv for hv in self.HVs if not self._isHVFull(hv)]
-            if len(avail_hvs) == 0:
-                error("\nCannot get hv_name: No hypervisor is available.\n")
-                return
-            max_hv = max(avail_hvs, key=lambda hv: len(hv.nameToVMs))
-            hv_name = max_hv.name
-        else:
-            error("\nCannot get hv_name: VM distribution mode invalid.\n")
+        vm_dist_handler = getattr(self, "_vm_dist_" + self.vm_dist_mode, None)
+        if not vm_dist_handler:
+            error_msg = "VM distribution mode %s invalid" % self.vm_dist_mode
+            error("\nCannot get hv_name: %s.\n" % error_msg)
             return
-
+        hv_name = vm_dist_handler()
         return hv_name
 
-    def _isHVFull( self, hv ):
-        "Check if the hypervisor has reached its VM capacity limit."
+    def getPossibleVMDistModes( self ):
+        "Dynamically obtain all possible VM distribution mode names."
+        # FIXME: Make a class method instead?
+        vm_dist_prefix = "_vm_dist_"
+        method_list = CMSnet.__dict__  # dir(self)
+        get_prefix = lambda method: method[:len(vm_dist_prefix)]
+        get_suffix = lambda method: method[len(vm_dist_prefix):]
+        is_dist_mode = lambda method: get_prefix(method) == vm_dist_prefix
+        
+        dist_mode_method_names = filter(is_dist_mode, method_list)
+        dist_mode_names = map(get_suffix, dist_mode_method_names)
+        return dist_mode_names
+
+    def isHVFull( self, hv ):
+        "Check if hypervisor has reached its VM capacity limit (packed mode)."
         hv_limit = hv.vm_dist_limit
         limit = hv_limit if hv_limit else self.vm_dist_limit
-        return len(hv.nameToVMs) < limit
+        return len(hv.nameToVMs) >= limit
 
     def _efficientPackedDistMode( self ):
         "UNUSED. An efficient version of the packed mode (loops only once)."
@@ -429,12 +445,75 @@ class CMSnet( object ):
         for hv in self.HVs:   # Somehow, while loops suck (not in C?)
             vm_num = len(hv.nameToVMs)
             if vm_num >= temp_num:
-                if not self._isHVFull(hv):
+                if not self.isHVFull(hv):
                     temp_num = vm_num
                     hv_name = hv.name
         if hv_name is None:
-            error("\nCannot get hv_name: No hypervisor is available.\n")
+            error_msg = "No hypervisor is available"
+            error("\nCannot get hv_name: %s.\n" % error_msg)
+            return
         return hv_name
+
+    def _vm_dist_random( self ):
+        "Choose a random HV."
+        rand_hv = random.choice(self.HVs)
+        return rand_hv.name
+
+    def _vm_dist_sparse( self ):
+        "Choose HVs sparsely and evenly."
+        min_hv = min(self.HVs, key=lambda hv: len(hv.nameToVMs))
+        return min_hv.name
+
+    def _vm_dist_packed( self ):
+        "Choose HVs so that VMs are packed together."
+        # return self._efficientPackedDistMode()
+        avail_hvs = [hv for hv in self.HVs if not self.isHVFull(hv)]
+        if len(avail_hvs) == 0:
+            error_msg = "No hypervisor is available"
+            error("\nCannot get hv_name: %s.\n" % error_msg)
+            return
+        max_hv = max(avail_hvs, key=lambda hv: len(hv.nameToVMs))
+        return max_hv.name
+
+    def _vm_dist_same( self ):
+        "Choose an HV the same as the last chosen one."
+        if not self.last_HV:
+            error_msg = "No hypervisor last chosen"
+            error("\nCannot get hv_name: %s.\n" % error_msg)
+            return
+        same_hv = self.last_HV      # TODO: Implement self.last_HV
+        return same_hv.name
+
+    def _vm_dist_different( self ):
+        "Choose a random HV different from the last chosen one."
+        if not self.last_HV:
+            error_msg = "No hypervisor last chosen"
+            error("\nCannot get hv_name: %s.\n" % error_msg)
+            return
+        diff_hv = random.choice([hv for hv in self.HVs if hv != self.last_HV])
+        return diff_hv.name
+
+    def _vm_dist_next( self ):
+        "Choose HVs in a cycle."
+        if not self.last_HV:
+            error_msg = "No hypervisor last chosen"
+            error("\nCannot get hv_name: %s.\n" % error_msg)
+            return
+        last_hv_index = self.HVs.index(self.last_HV)
+        next_hv_index = (last_hv_index + 1) % len(self.HVs)
+        next_hv = self.HVs[next_hv_index]
+        return next_hv.name
+
+    def _vm_dist_previous( self ):
+        "Choose HVs in a cycle, rotating in reverse."
+        if not self.last_HV:
+            error_msg = "No hypervisor last chosen"
+            error("\nCannot get hv_name: %s.\n" % error_msg)
+            return
+        last_hv_index = self.HVs.index(self.last_HV)
+        prev_hv_index = (last_hv_index - 1) % len(self.HVs)
+        prev_hv = self.HVs[prev_hv_index]
+        return prev_hv.name
 
 
 
