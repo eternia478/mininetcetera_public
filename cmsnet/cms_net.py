@@ -92,8 +92,6 @@ import select
 import signal
 from time import sleep
 from itertools import chain
-# @GLY
-import random
 
 from mininet.cli import CLI
 from mininet.log import info, warn, error, debug, output
@@ -103,7 +101,9 @@ from mininet.util import quietRun, fixLimits, numCores, ensureRoot, moveIntf
 from mininet.util import macColonHex, ipStr, ipParse, netParse, ipAdd
 from mininet.term import cleanUpScreens, makeTerms
 from mininet.net import Mininet
+
 from cmsnet.cms_comp import CMSComponent, VirtualMachine, Hypervisor
+import random
 import socket
 import json
 defaultDecoder = json.JSONDecoder()
@@ -347,6 +347,16 @@ class CMSnet( object ):
             self.controller_socket.close()
             self.controller_socket = None
 
+    def send_msg_to_controller(self, cmd_type, vm):
+        "Send a CMS message to the controller."
+        msg = {
+          'CHANNEL' : 'CMS',
+          #'cmd_type' : cmd_type,  # TODO: Implement me.
+          'host' : vm.name,
+          'new_hv': vm.hv_name
+        }
+        if self.controller_socket:
+            self.controller_socket.send(json.dumps(msg))
 
 
 
@@ -481,7 +491,7 @@ class CMSnet( object ):
             error_msg = "No hypervisor last chosen"
             error("\nCannot get hv_name: %s.\n" % error_msg)
             return
-        same_hv = self.last_HV      # TODO: Implement self.last_HV
+        same_hv = self.last_HV
         return same_hv.name
 
     def _vm_dist_different( self ):
@@ -519,6 +529,9 @@ class CMSnet( object ):
 
 
 
+
+
+
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
     # CMS Main Commands (ZZZ)
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
@@ -546,22 +559,19 @@ class CMSnet( object ):
         vm = vm_cls(host, self.config_folder) #vm_script
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm
-        
+
         return vm
 
-    def launchVM( self, vm_name, hv_name= None ):
+    def launchVM( self, vm_name, hv_name=None ):
         "Initialize the created VM on a hypervisor."
         if self.debug_flag1:
             print "EXEC: launchVM(%s, %s):" % (vm_name, hv_name)
-        
-        
-        #@GLY       
+
         if hv_name == None:
-          hv_name = self._getNextDefaultHVName() 
-          if hv_name == None:
-            return "ERROR: No hv is avaliable"
-       
-       
+            hv_name = self._getNextDefaultHVName()
+            if hv_name == None:  # Some error occurred.
+                return           # Return and do nothing.
+
         assert vm_name in self.nameToComp
         assert hv_name in self.nameToComp
         vm = self.nameToComp.get(vm_name)
@@ -571,38 +581,11 @@ class CMSnet( object ):
         assert not vm.is_running()
         assert hv.is_enabled()
 
-        # self.not_implemented()
-        
-        dummy = self.mn.nameToNode.get("dummy", None)
-        
-        for intf in vm.node.intfs.values():
-          print "old link: ", intf.link
-          if intf.link.intf1 == intf: 
-            vm_intf = intf
-            old_intf = intf.link.intf2
-            # print "Old node is: ", old_intf.node
-                      
-          if intf.link.intf2 == intf:
-            vm_intf = intf 
-            old_intf = intf.link.intf1
-            # print "Old node is: ", old_intf.node             
-        vm_intf_name =  intf.name
-        self._moveLink(vm.node, hv.node, vm_intf_name)
-        print "new link: ", vm_intf.link
-        
-        # print "New node is: ", old_intf.node
-        vm.launch(hv)  
-      
-        "Sending msg to comtroller"
-        msg = {
-          'CHANNEL' : 'CMS',
-          'host' : vm_name,
-           #'old_hv': old_intf.node.name,
-          'new_hv': hv_name
-        }      
-        if self.controller_socket:
-            self.controller_socket.send(json.dumps(msg))       
-        
+        self._moveLink(vm.node, hv.node)
+        vm.launch(hv)
+        self.last_HV = hv
+        self.send_msg_to_controller("launch", vm)
+
     def migrateVM( self, vm_name, hv_name ):
         "Migrate a running image to another hypervisor."
         if self.debug_flag1:
@@ -617,36 +600,9 @@ class CMSnet( object ):
         assert vm.is_running()
         assert hv.is_enabled()
 
-        # self.not_implemented()
-        
-          
-        for intf in vm.node.intfs.values():
-          print "old link: ", intf.link
-          if intf.link.intf1 == intf:
-            vm_intf = intf
-            ## old_intf = intf.link.intf2
-            ## print "Old node is: ", old_intf.node
-          if intf.link.intf2 == intf:
-            vm_intf = intf
-            ## old_intf = intf.link.intf1
-            ## print "Old node is: ", old_intf.node
-        
-        vm_intf_name = vm_intf.name
-        self._moveLink(vm.node, hv.node, vm_intf_name)
-        print "new link: ", vm_intf.link
-        # print "New node is: ", old_intf.node
+        self._moveLink(vm.node, hv.node)
         vm.moveTo(hv)
-        
-        "Sending msg to comtroller"
-        msg = {
-          'CHANNEL' : 'CMS',
-          'host' : vm_name,
-          ## 'old_hv':  old_intf.node.name,
-          'new_hv': hv_name
-        }
-        self.controller_socket.send(json.dumps(msg))       
-
-       
+        self.send_msg_to_controller("migrate", vm)
 
     def stopVM( self, vm_name ):
         "Stop a running image."
@@ -656,41 +612,11 @@ class CMSnet( object ):
         assert vm_name in self.nameToComp
         vm = self.nameToComp.get(vm_name)
         assert isinstance(vm, VirtualMachine)
-        # @GLY
-        if not vm.is_running():
-            return
-        #assert vm.is_running()
+        assert vm.is_running()
 
-        # self.not_implemented()
-        
-        dummy = self.mn.nameToNode.get("dummy", None)
-        for intf in vm.node.intfs.values():
-          print "old link: ", intf.link
-          if intf.link.intf1 == intf:
-            vm_intf = intf
-            ## old_intf = intf.link.intf2
-            ## print "Old node is: ", old_intf.node
-          if intf.link.intf2 == intf:
-            vm_intf = intf
-            ## old_intf = intf.link.intf1
-            ## print "Old node is: ", old_intf.node
-        vm_intf_name = vm_intf.name
-        self._removeLink(vm.node, vm_intf_name)
-        print "new link: ", vm_intf.link
-        vm.stop() 
-        
-        "Sending msg to comtroller"
-        msg = {
-          'CHANNEL' : 'CMS',
-          'host' : vm_name,
-          ## 'old_hv': old_node.name,
-          'new_hv': dummy.name,
-        }
-        if self.controller_socket:
-            self.controller_socket.send(json.dumps(msg))       
-        
-        
-       
+        vm.stop()
+        self._removeLink(vm.node)
+        self.send_msg_to_controller("stop", vm)
 
     def deleteVM( self, vm_name ):
         "Remove the virtual machine image from the hypervisor."
@@ -743,18 +669,20 @@ class CMSnet( object ):
 
         self.not_implemented()
 
-    def changeVMDistributionMode( self, vm_dist_mode, vm_dist_limit = None ):
+    def changeVMDistributionMode( self, vm_dist_mode, vm_dist_limit=None ):
         "Change the mode of VM distribution across hypervisors."
         if self.debug_flag1:
-            print "EXEC: changeVMDistributionMode(%s):" % vm_dist_mode
+            args = (vm_dist_mode, vm_dist_limit)
+            print "EXEC: changeVMDistributionMode(%s, %s):" % args
 
         assert vm_dist_mode in self.possible_modes
 
         self.vm_dist_mode = vm_dist_mode
         self.update_net_config()
-        # @GLY
-        if (vm_dist_mode =="packed") and  vm_dist_limit:
-          self.vm_dist_limit = vm_dist_limit
+
+        if vm_dist_mode == "packed" and vm_dist_limit:
+            assert vm_dist_limit > 0
+            self.vm_dist_limit = vm_dist_limit
 
     def enableHV( self, hv_name ):
         "Enable a hypervisor."
