@@ -268,7 +268,49 @@ class CMSCLI( Cmd ):
         
         if not err:
             self.cn.createVM(vm_name)
+    # @GLY
+    def do_clone (self , line):
+        args = line.split()
+        vm_name = None
+        new_name = None
+        if len(args) == 1:
+            vm_name = args[0]
+        elif len(args) == 2:
+            vm_name = args[0]
+            new_name = args[1]
+        else:
+            error('invalid number of args: clone vm_name [new_name]\n')
+            return
+        # ???
+        err1 = self._check_vm_name(vm_name, exp_exist=True, exp_running=None)
+        err2 = self._check_vm_name(new_name, exp_exist=False, exp_running=None)
+        if not err1 and not err2:
+            self.cn.cloneVM(vm_name, new_name)
+    """
+    def do_cp( self, line ):
+        "Clone a virtual machine image."
+        args = line.split()
+        vm1_name = None
+        vm2_name = None
+        #vm2_script = None              # TODO: Change here as well.
+        #vm2_ip = None
+        #vm2_extra_params = {}
 
+        if len(args) == 2:
+            vm1_name = args[0]
+            vm2_name = args[1]
+        else:
+            error('invalid number of args: cp vm_name1 vm_name2\n')
+            return
+
+        err1 = self._check_vm_name(vm1_name, exp_exist=True, exp_running=None)
+        err2 = self._check_vm_name(vm2_name, exp_exist=False, exp_running=None)
+
+        if not err1 and not err2:
+            self.cn.cloneVM(vm1_name, vm2_name)
+    """
+    
+        
     def do_launch( self, line ):
         "Initialize the created VM on a hypervisor."
         args = line.split()
@@ -341,27 +383,7 @@ class CMSCLI( Cmd ):
         if not err:
             self.cn.deleteVM(vm_name)
 
-    def do_cp( self, line ):
-        "Clone a virtual machine image."
-        args = line.split()
-        vm1_name = None
-        vm2_name = None
-        #vm2_script = None              # TODO: Change here as well.
-        #vm2_ip = None
-        #vm2_extra_params = {}
-
-        if len(args) == 2:
-            vm1_name = args[0]
-            vm2_name = args[1]
-        else:
-            error('invalid number of args: cp vm_name1 vm_name2\n')
-            return
-
-        err1 = self._check_vm_name(vm1_name, exp_exist=True, exp_running=None)
-        err2 = self._check_vm_name(vm2_name, exp_exist=False, exp_running=None)
-
-        if not err1 and not err2:
-            self.cn.cloneVM(vm1_name, vm2_name)
+    
 
     def do_mode( self, line ):
         "Change the mode of VM distribution across hypervisors."
