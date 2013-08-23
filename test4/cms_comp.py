@@ -110,7 +110,7 @@ class VirtualMachine( CMSComponent ):
         self.check_comp_config()
         self.update_comp_config()
         self.have_comp_config = True
-        self.tenentID = None
+        self.tenantID = None
 
     @property
     def IP( self ):
@@ -183,7 +183,13 @@ class VirtualMachine( CMSComponent ):
     def is_running( self ):
         "Test if this VM image is running (or inactive) on any hypervisor."
         return self.hv_name is not None
-
+    # @GLY
+    def cloneto (self, vm_new):
+        "clone the tenant ID and scripts"
+        vm_new.start_script = self.start_script
+        vm_new.stop_script = self.stop_script
+        vm_new.tenantID = self.tenantID   
+        
     def launch( self, hv ):
         "Initialize the VM on the input hypervisor."
         assert not self.is_running()
@@ -243,10 +249,7 @@ class Hypervisor( CMSComponent ):
 
         self.nameToVMs = {}   # UNUSED: mapping for VMs in this hypervisor
         self._enabled = True
-        if vm_limit == None:
-            self.vm_limit = 10
-        else:
-            self.vm_limit = vm_limit
+        self.vm_limit = vm_limit
 
     def __repr__( self ):
         "More informative string representation"
@@ -268,6 +271,5 @@ class Hypervisor( CMSComponent ):
         "Disable the hypervisor from running VMs."
         assert self.is_enabled()
         self._enabled = False
-
 
 
