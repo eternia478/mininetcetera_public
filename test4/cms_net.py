@@ -40,7 +40,7 @@ class CMSnet( object ):
                   new_config=False, config_folder=".",
                   net_cls=Mininet, vm_cls=VirtualMachine, hv_cls=Hypervisor,
                   controller_ip="127.0.0.1", controller_port=7790, msglevel =
-                  "instantiated", **params):
+                  None, **params):
         """Create Mininet object.
            vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
            new_config: True if we are using brand new configurations.
@@ -500,7 +500,7 @@ class CMSnet( object ):
         msg = {
           'CHANNEL' : 'CMS',
           'msglevel': self.msglevel,
-          'type' : 'instantiated',
+          'cmd' : 'instantiated',
           'host' : vm_name,
            #'old_hv': old_intf.node.name,
           'new_hv': hv_name
@@ -546,7 +546,7 @@ class CMSnet( object ):
         "Sending msg to comtroller"
         msg = {
           'CHANNEL' : 'CMS',
-          'type' : 'migrated',
+          'cmd' : 'migrated',
           'msglevel': self.msglevel,
           'host' : vm_name,
           ## 'old_hv':  old_intf.node.name,
@@ -591,7 +591,7 @@ class CMSnet( object ):
         "Sending msg to comtroller"
         msg = {
           'CHANNEL' : 'CMS',
-          'type' : 'destroyed',
+          'cmd' : 'destroyed',
           'msglevel': self.msglevel,
           'host' : vm_name,
           ## 'old_hv': old_node.name,
