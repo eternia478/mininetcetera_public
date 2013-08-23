@@ -88,7 +88,8 @@ LINKS = { 'default': Link,
           'tc': TCLink }
 
 # Added
-VM_DIST_MODES = [ 'random', 'packed', 'sparse' ]
+#VM_DIST_MODES = [ 'random', 'packed', 'sparse' ]
+VM_DIST_MODES = CMSnet.getPossibleVMDistModes()
 
 # optional tests to run
 # Changed
@@ -194,6 +195,8 @@ class MininetRunner( object ):
         opts.add_option( '--vm_dist_mode', type='choice',
                          choices=VM_DIST_MODES, default=VM_DIST_MODES[ 0 ],
                          help='|'.join( VM_DIST_MODES ) )
+        opts.add_option( '--vm_dist_limit', type='int', default=10,
+                          help='packed mode capacity limit' )
         opts.add_option( '--new_config', action='store_true',
                          default=False, help='use only new configuration' )
         opts.add_option( '--config_folder', type='string', default='.',
@@ -270,6 +273,7 @@ class MininetRunner( object ):
         hv_cls = HVS.get(self.options.hypervisor)
         dummy = DUMMIES.get(self.options.dummy)
         vm_dist_mode = self.options.vm_dist_mode
+        vm_dist_limit = self.options.vm_dist_limit
         new_config = self.options.new_config
         config_folder = self.options.config_folder
         controller_ip = self.options.controller_ip
@@ -296,7 +300,7 @@ class MininetRunner( object ):
             listenPort = self.options.listenport
 
         # Changed
-        cn = CMSnet( vm_dist_mode=vm_dist_mode,
+        cn = CMSnet( vm_dist_mode=vm_dist_mode, vm_dist_limit=vm_dist_limit,
                      new_config=new_config, config_folder=config_folder,
                      net_cls=Net, vm_cls=vm_cls, hv_cls=hv_cls,
                      controller_ip=controller_ip, 
