@@ -92,6 +92,8 @@ import select
 import signal
 from time import sleep
 from itertools import chain
+# @GLY
+import random
 
 from mininet.cli import CLI
 from mininet.log import info, warn, error, debug, output
@@ -121,7 +123,7 @@ VERSION = "2.0.0.i.x.beta"
 class CMSnet( object ):
     "Network emulation with hosts spawned in network namespaces."
 
-    def __init__( self, vm_dist_mode="random",
+    def __init__( self, vm_dist_mode="random",vm_dist_limit=10,
                   new_config=False, config_folder=".",
                   net_cls=Mininet, vm_cls=VirtualMachine, hv_cls=Hypervisor,
                   controller_ip="127.0.0.1", controller_port=7790, **params):
@@ -136,6 +138,7 @@ class CMSnet( object ):
            controller_port = Port to connect to for the controller socket.
            params: extra paramters for Mininet"""
         self.vm_dist_mode = vm_dist_mode
+        self.vm_dist_limit = vm_dist_limit
         self.config_folder = config_folder
         self.net_cls = net_cls
         self.vm_cls = vm_cls
@@ -425,10 +428,37 @@ class CMSnet( object ):
         return host
 
 
-    def launchVM( self, vm_name, hv_name ):
+    def launchVM( self, vm_name, hv_name= None ):
         "Initialize the created VM on a hypervisor."
         if self.debug_flag1:
             print "EXEC: launchVM(%s, %s):" % (vm_name, hv_name)
+        
+        
+        #@GLY       
+        if hv_name == None:
+          if self.vm_dist_mode == 'random':
+            temp_num = ramdom.randint(0,len(self.HVs)-1)
+            hv = self.HVs[temp_num]
+            hv_name = hv.node.name
+          
+          if self.vm_dist_mode == 'sparse':
+            temp_num = len( self.HVs[0].nameToVMs)
+            hv_name = self.HVs[0].node.name
+            for hv in self.HVs:
+              if len (hv.nameToVMs) <= temp_num:
+                 hv_name = hv.node.name                      
+          
+          if self.vm_dist_mode == 'packed':
+            temp_num = len( self.HVs[0].nameToVMs)
+            hv_name = None
+            for hv in self.HVs:
+              if len (hv.nameToVMs) >= temp_num:
+                if len (hv.nameToVMs) < self.vm_dist_limit:
+                  if hv.vm_limit and len (hv.nameToVMs)< hv.vm_limit:
+                    hv_name = hv.node.name 
+            if hv_name == None:
+              return "ERROR: No hv is avaliable" 
+       
        
         assert vm_name in self.nameToComp
         assert hv_name in self.nameToComp
@@ -571,7 +601,16 @@ class CMSnet( object ):
         if vm.is_running():
             self.stopVM(vm_name)
 
-        self.not_implemented()
+        # self.not_implemented()
+        
+        self.stopVM(vm_name)
+        vm = self.nameToComp[vm_name]
+        self.VMs.remove(vm)
+        del self.nameToComp[ vm_name ]
+        info( '*** Stopping host: %s\n' % vm_name ) 
+        vm.node.terminate()
+        # Remove the file
+        os.remove(vm.get_config_file_name()) 
 
         """
         # NOTE: many details on this one is hard to do, so
@@ -602,7 +641,7 @@ class CMSnet( object ):
 
         self.not_implemented()
 
-    def changeVMDistributionMode( self, vm_dist_mode ):
+    def changeVMDistributionMode( self, vm_dist_mode, vm_dist_limit = None ):
         "Change the mode of VM distribution across hypervisors."
         if self.debug_flag1:
             print "EXEC: changeVMDistributionMode(%s):" % vm_dist_mode
@@ -611,6 +650,9 @@ class CMSnet( object ):
 
         self.vm_dist_mode = vm_dist_mode
         self.update_net_config()
+        # @GLY
+        if (vm_dist_mode =="packed") and  vm_dist_limit:
+          self.vm_dist_limit = vm_dist_limit
 
     def enableHV( self, hv_name ):
         "Enable a hypervisor."
@@ -702,7 +744,7 @@ class CMSnet( object ):
         self.mn.nameToNode[ name ] = dummy_new
         return dummy_new
 
-    def _createHostAtDummy( self, hostName ):
+    def _createHostAtDummy( self, hostName , **params):
         """
         Add a host node to Mininet and link it to the dummy.
 

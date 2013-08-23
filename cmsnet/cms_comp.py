@@ -240,7 +240,7 @@ class Hypervisor( CMSComponent ):
     """A hypervisor that virtual machines run on. A wrapper class for the
        Switch class."""
 
-    def __init__( self, node, config_folder="." ):
+    def __init__( self, node, config_folder="." , vm_limit = None):
         """
         Intialization
 
@@ -252,6 +252,10 @@ class Hypervisor( CMSComponent ):
 
         self.nameToVMs = {}   # UNUSED: mapping for VMs in this hypervisor
         self._enabled = True
+        if vm_limit == None:
+            self.vm_limit = 10
+        else:
+            self.vm_limit = vm_limit
 
     def __repr__( self ):
         "More informative string representation"
