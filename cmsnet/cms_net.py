@@ -392,26 +392,48 @@ class CMSnet( object ):
         return self.mn.addSwitch(name, **params)
 
     def _getNextDefaultHVName( self ):
+        "Using the distribution mode, get the next default hv_name"
+        if len(self.HVs) > 0:
+            error("\nCannot get hv_name: No hypervisor exists.\n")
+            return
+
         if self.vm_dist_mode == 'random':
-          temp_num = ramdom.randint(0,len(self.HVs)-1)
-          hv = self.HVs[temp_num]
-          hv_name = hv.node.name
-        
-        if self.vm_dist_mode == 'sparse':
-          temp_num = len( self.HVs[0].nameToVMs)
-          hv_name = self.HVs[0].node.name
-          for hv in self.HVs:
-            if len (hv.nameToVMs) <= temp_num:
-               hv_name = hv.node.name                      
-        
-        if self.vm_dist_mode == 'packed':
-          temp_num = len( self.HVs[0].nameToVMs)
-          hv_name = None
-          for hv in self.HVs:
-            if len (hv.nameToVMs) >= temp_num:
-              if len (hv.nameToVMs) < self.vm_dist_limit:
-                if hv.vm_limit and len (hv.nameToVMs)< hv.vm_limit:
-                  hv_name = hv.node.name 
+            hv_name = random.choice(self.HVs).name
+        elif self.vm_dist_mode == 'sparse':
+            min_hv = min(self.HVs, key=lambda hv: len(hv.nameToVMs))
+            hv_name = min_hv.name
+        elif self.vm_dist_mode == 'packed':
+            # hv_name = self._efficientPackedDistMode()
+            avail_hvs = [hv for hv in self.HVs if not self._isHVFull(hv)]
+            if len(avail_hvs) == 0:
+                error("\nCannot get hv_name: No hypervisor is available.\n")
+                return
+            max_hv = max(avail_hvs, key=lambda hv: len(hv.nameToVMs))
+            hv_name = max_hv.name
+        else:
+            error("\nCannot get hv_name: VM distribution mode invalid.\n")
+            return
+
+        return hv_name
+
+    def _isHVFull( self, hv ):
+        "Check if the hypervisor has reached its VM capacity limit."
+        hv_limit = hv.vm_dist_limit
+        limit = hv_limit if hv_limit else self.vm_dist_limit
+        return len(hv.nameToVMs) < limit
+
+    def _efficientPackedDistMode( self ):
+        "UNUSED. An efficient version of the packed mode (loops only once)."
+        temp_num = 0
+        hv_name = None
+        for hv in self.HVs:   # Somehow, while loops suck (not in C?)
+            vm_num = len(hv.nameToVMs)
+            if vm_num >= temp_num:
+                if not self._isHVFull(hv):
+                    temp_num = vm_num
+                    hv_name = hv.name
+        if hv_name is None:
+            error("\nCannot get hv_name: No hypervisor is available.\n")
         return hv_name
 
 
