@@ -391,7 +391,28 @@ class CMSnet( object ):
         params.update({"cms_net": "fabric", "cls": POXNormalSwitch})
         return self.mn.addSwitch(name, **params)
 
-
+    def _getNextDefaultHVName( self ):
+        if self.vm_dist_mode == 'random':
+          temp_num = ramdom.randint(0,len(self.HVs)-1)
+          hv = self.HVs[temp_num]
+          hv_name = hv.node.name
+        
+        if self.vm_dist_mode == 'sparse':
+          temp_num = len( self.HVs[0].nameToVMs)
+          hv_name = self.HVs[0].node.name
+          for hv in self.HVs:
+            if len (hv.nameToVMs) <= temp_num:
+               hv_name = hv.node.name                      
+        
+        if self.vm_dist_mode == 'packed':
+          temp_num = len( self.HVs[0].nameToVMs)
+          hv_name = None
+          for hv in self.HVs:
+            if len (hv.nameToVMs) >= temp_num:
+              if len (hv.nameToVMs) < self.vm_dist_limit:
+                if hv.vm_limit and len (hv.nameToVMs)< hv.vm_limit:
+                  hv_name = hv.node.name 
+        return hv_name
 
 
 
@@ -435,28 +456,9 @@ class CMSnet( object ):
         
         #@GLY       
         if hv_name == None:
-          if self.vm_dist_mode == 'random':
-            temp_num = ramdom.randint(0,len(self.HVs)-1)
-            hv = self.HVs[temp_num]
-            hv_name = hv.node.name
-          
-          if self.vm_dist_mode == 'sparse':
-            temp_num = len( self.HVs[0].nameToVMs)
-            hv_name = self.HVs[0].node.name
-            for hv in self.HVs:
-              if len (hv.nameToVMs) <= temp_num:
-                 hv_name = hv.node.name                      
-          
-          if self.vm_dist_mode == 'packed':
-            temp_num = len( self.HVs[0].nameToVMs)
-            hv_name = None
-            for hv in self.HVs:
-              if len (hv.nameToVMs) >= temp_num:
-                if len (hv.nameToVMs) < self.vm_dist_limit:
-                  if hv.vm_limit and len (hv.nameToVMs)< hv.vm_limit:
-                    hv_name = hv.node.name 
-            if hv_name == None:
-              return "ERROR: No hv is avaliable" 
+          hv_name = self._getNextDefaultHVName() 
+          if hv_name == None:
+            return "ERROR: No hv is avaliable"
        
        
         assert vm_name in self.nameToComp
