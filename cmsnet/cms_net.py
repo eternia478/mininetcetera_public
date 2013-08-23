@@ -429,11 +429,11 @@ class CMSnet( object ):
         hv_name = vm_dist_handler()
         return hv_name
 
-    def getPossibleVMDistModes( self ):
+    @classmethod
+    def getPossibleVMDistModes( cls ):
         "Dynamically obtain all possible VM distribution mode names."
-        # FIXME: Make a class method instead?
         vm_dist_prefix = "_vm_dist_"
-        method_list = CMSnet.__dict__  # dir(self)
+        method_list = cls.__dict__  # dir(cls)
         get_prefix = lambda method: method[:len(vm_dist_prefix)]
         get_suffix = lambda method: method[len(vm_dist_prefix):]
         is_dist_mode = lambda method: get_prefix(method) == vm_dist_prefix
