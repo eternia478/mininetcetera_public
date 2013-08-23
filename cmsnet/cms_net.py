@@ -405,27 +405,31 @@ class CMSnet( object ):
 
 
 
-    def createVM( self, vm_name ):
+    def createVM( self, vm_name, cls = None, **params ):
         "Create a virtual machine image."
         if self.debug_flag1:
             print "EXEC: createVM(%s):" % vm_name
 
         assert vm_name not in self.nameToComp
 
-        self.not_implemented()
-        host = self._createHostAtDummy(vm_name)
-        vm = vm_cls(host, self.config_folder)
+        # self.not_implemented()
+        host = self._createHostAtDummy(vm_name, cls = cls, **params)
+        # @GLY
+        vm = self.vm_cls(host, self.config_folder)
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm
         
-        # return host
+        
+        
+        
+        return host
 
 
     def launchVM( self, vm_name, hv_name ):
         "Initialize the created VM on a hypervisor."
         if self.debug_flag1:
             print "EXEC: launchVM(%s, %s):" % (vm_name, hv_name)
-
+       
         assert vm_name in self.nameToComp
         assert hv_name in self.nameToComp
         vm = self.nameToComp.get(vm_name)
@@ -435,22 +439,25 @@ class CMSnet( object ):
         assert not vm.is_running()
         assert hv.is_enabled()
 
-        self.not_implemented()
+        # self.not_implemented()
         
         dummy = self.mn.nameToNode.get("dummy", None)
         
         for intf in vm.node.intfs.values():
-          if intf.link.intf1.node == dummy: 
+          print "old link: ", intf.link
+          if intf.link.intf1 == intf: 
             vm_intf = intf
-            ## old_intf = intf.link.intf2
-            ## print "Old node is: ", old_intf.node
+            old_intf = intf.link.intf2
+            # print "Old node is: ", old_intf.node
                       
-          if intf.link.intf2.node == dummy:
+          if intf.link.intf2 == intf:
             vm_intf = intf 
-            ## old_intf = intf.link.intf1
-            ## print "Old node is: ", old_intf.node             
+            old_intf = intf.link.intf1
+            # print "Old node is: ", old_intf.node             
         vm_intf_name =  intf.name
         self._moveLink(vm.node, hv.node, vm_intf_name)
+        print "new link: ", vm_intf.link
+        
         # print "New node is: ", old_intf.node
         vm.launch(hv)  
       
@@ -458,10 +465,11 @@ class CMSnet( object ):
         msg = {
           'CHANNEL' : 'CMS',
           'host' : vm_name,
-          ## 'old_hv': old_intf.node.name,
+           #'old_hv': old_intf.node.name,
           'new_hv': hv_name
         }      
-        self.controller_socket.send(json.dumps(msg))       
+        if self.controller_socket:
+            self.controller_socket.send(json.dumps(msg))       
         
     def migrateVM( self, vm_name, hv_name ):
         "Migrate a running image to another hypervisor."
@@ -477,10 +485,11 @@ class CMSnet( object ):
         assert vm.is_running()
         assert hv.is_enabled()
 
-        self.not_implemented()
+        # self.not_implemented()
         
           
         for intf in vm.node.intfs.values():
+          print "old link: ", intf.link
           if intf.link.intf1 == intf:
             vm_intf = intf
             ## old_intf = intf.link.intf2
@@ -492,6 +501,7 @@ class CMSnet( object ):
         
         vm_intf_name = vm_intf.name
         self._moveLink(vm.node, hv.node, vm_intf_name)
+        print "new link: ", vm_intf.link
         # print "New node is: ", old_intf.node
         vm.moveTo(hv)
         
@@ -514,12 +524,16 @@ class CMSnet( object ):
         assert vm_name in self.nameToComp
         vm = self.nameToComp.get(vm_name)
         assert isinstance(vm, VirtualMachine)
-        assert vm.is_running()
+        # @GLY
+        if not vm.is_running():
+            return
+        #assert vm.is_running()
 
-        self.not_implemented()
+        # self.not_implemented()
         
         dummy = self.mn.nameToNode.get("dummy", None)
         for intf in vm.node.intfs.values():
+          print "old link: ", intf.link
           if intf.link.intf1 == intf:
             vm_intf = intf
             ## old_intf = intf.link.intf2
@@ -530,6 +544,7 @@ class CMSnet( object ):
             ## print "Old node is: ", old_intf.node
         vm_intf_name = vm_intf.name
         self._removeLink(vm.node, vm_intf_name)
+        print "new link: ", vm_intf.link
         vm.stop() 
         
         "Sending msg to comtroller"
@@ -539,7 +554,8 @@ class CMSnet( object ):
           ## 'old_hv': old_node.name,
           'new_hv': dummy.name,
         }
-        self.controller_socket.send(json.dumps(msg))       
+        if self.controller_socket:
+            self.controller_socket.send(json.dumps(msg))       
         
         
        
