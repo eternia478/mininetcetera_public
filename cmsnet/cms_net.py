@@ -238,7 +238,7 @@ class CMSnet( object ):
     def check_net_config( self ):
         "Check for any previous CMSnet configurations and adjust if necessary."
         try:
-            with open(self.config_folder+"/cm.config_cmsnet", "r") as f:
+            with open(self.config_folder+"/cn.config_cmsnet", "r") as f:
                 config_raw = f.read()
                 config = {}
                 if config_raw:
@@ -270,9 +270,10 @@ class CMSnet( object ):
 
     def update_net_config( self ):
         "Update the CMSnet configurations file."
-        f = open(self.config_folder+"/cm.config_cmsnet", "w")
+        f = open(self.config_folder+"/cn.config_cmsnet", "w")
         config = {}
         config["vm_dist_mode"] = self.vm_dist_mode
+        config["vm_dist_limit"] = self.vm_dist_limit
         config["net_cls"] = self.net_cls.__name__
         config["vm_cls"] = self.vm_cls.__name__
         config["hv_cls"] = self.hv_cls.__name__
