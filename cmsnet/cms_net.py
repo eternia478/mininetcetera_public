@@ -408,25 +408,24 @@ class CMSnet( object ):
 
 
 
-    def createVM( self, vm_name, cls = None, **params ):
+    def createVM( self, vm_name, vm_cls=None, host_cls=None, **params ):
         "Create a virtual machine image."
         if self.debug_flag1:
-            print "EXEC: createVM(%s):" % vm_name
+            args = (vm_name, vm_cls, host_cls, params)
+            print "EXEC: createVM(%s, %s, %s, %s):" % args
 
         assert vm_name not in self.nameToComp
+        assert not vm_cls or issubclass(vm_cls, VirtualMachine)
+        assert not host_cls or issubclass(host_cls, Host)
 
-        # self.not_implemented()
-        host = self._createHostAtDummy(vm_name, cls = cls, **params)
-        # @GLY
-        vm = self.vm_cls(host, self.config_folder)
+        host = self._createHostAtDummy(vm_name, cls=host_cls, **params)
+        if not vm_cls:
+            vm_cls = self.vm_cls
+        vm = vm_cls(host, self.config_folder) #vm_script
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm
         
-        
-        
-        
-        return host
-
+        return vm
 
     def launchVM( self, vm_name, hv_name= None ):
         "Initialize the created VM on a hypervisor."
@@ -744,11 +743,12 @@ class CMSnet( object ):
         self.mn.nameToNode[ name ] = dummy_new
         return dummy_new
 
-    def _createHostAtDummy( self, hostName , **params):
+    def _createHostAtDummy( self, hostName, **params ):
         """
         Add a host node to Mininet and link it to the dummy.
 
         hostName: name of the host
+        params: parameters for host
         """
         if self.debug_flag1:
             print "EXEC: createHostAtDummy(%s):" % hostName
@@ -769,7 +769,7 @@ class CMSnet( object ):
         # if self.topo:
         #     self.buildFromTopo( self.topo )
         info( '*** Adding host: %s\n' % hostName )
-        host = self.mn.addHost( hostName )
+        host = self.mn.addHost( hostName, **params )
         info( '*** Adding link: (%s, %s)\n' % ( host.name, dummy.name ) )
         hostPort = host.newPort()
         dummyPort = dummy.newPort()

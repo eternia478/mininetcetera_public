@@ -55,11 +55,12 @@ class MininetPatch(object):
 
     debug_flag1 = True   # Print statements everywhere.
 
-    def createHostAtDummy( self, hostName ):
+    def createHostAtDummy( self, hostName, **params ):
         """
         Add a host node to Mininet and link it to the dummy.
 
         hostName: name of the host
+        params: parameters for host
         """
         if self.debug_flag1:
             print "EXEC: createHostAtDummy(%s):" % hostName
@@ -80,7 +81,7 @@ class MininetPatch(object):
         # if self.topo:
         #     self.buildFromTopo( self.topo )
         info( '*** Adding host: %s\n' % hostName )
-        host = self.addHost( hostName )
+        host = self.addHost( hostName, **params )
         info( '*** Adding link: (%s, %s)\n' % ( host.name, dummy.name ) )
         hostPort = host.newPort()
         dummyPort = dummy.newPort()
