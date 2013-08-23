@@ -269,23 +269,27 @@ class CMSCLI( Cmd ):
         if not err:
             self.cn.createVM(vm_name)
 
-    def do_clone (self , line):
+    def do_cp( self, line, cmd_name='cp' ):
+        "Clone a virtual machine image."
         args = line.split()
-        vm_name = None
-        new_name = None
+        old_vm_name = None
+        new_vm_name = None
+
         if len(args) == 1:
-            vm_name = args[0]
+            old_vm_name = args[0]
         elif len(args) == 2:
-            vm_name = args[0]
-            new_name = args[1]
+            old_vm_name = args[0]
+            new_vm_name = args[1]
         else:
-            error('invalid number of args: clone vm_name [new_name]\n')
+            usage = '%s old_vm_name [new_vm_name]' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
-        # ???
-        err1 = self._check_vm_name(vm_name, exp_exist=True, exp_running=None)
-        err2 = self._check_vm_name(new_name, exp_exist=False, exp_running=None)
+
+        err1 = self._check_vm_name(old_vm_name, exp_exist=True, exp_running=None)
+        err2 = self._check_vm_name(new_vm_name, exp_exist=False, exp_running=None)
+
         if not err1 and not err2:
-            self.cn.cloneVM(vm_name, new_name)
+            self.cn.cloneVM(old_vm_name, new_vm_name)
 
     def do_launch( self, line ):
         "Initialize the created VM on a hypervisor."

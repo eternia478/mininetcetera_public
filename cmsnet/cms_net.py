@@ -565,31 +565,35 @@ class CMSnet( object ):
 
         return vm
 
-    def cloneVM (self, vm_name, new_name = None, cls = None, **params ):
-        "Create a virtual machine image."
+    def cloneVM( self, old_vm_name, new_vm_name=None ):
+        "Clone a virtual machine image."
         if self.debug_flag1:
-            print "EXEC: cloneVM(%s):" % vm_name
-        assert vm_name in self.nameToComp
-        assert new_name not in self.nameToComp
-        vm_old = self.nameToComp.get(vm_name)
-        assert isinstance(vm_old, VirtualMachine)
+            print "EXEC: cloneVM(%s, %s):" % (old_vm_name, new_vm_name)
+
+        if new_vm_name is None:          
+            new_vm_name = old_vm_name
+            while new_vm_name in self.nameToComp:
+                new_vm_name += ".cp"
+
+        assert old_vm_name in self.nameToComp
+        assert new_vm_name not in self.nameToComp
+        old_vm = self.nameToComp.get(old_vm_name)
+        assert isinstance(old_vm, VirtualMachine)
+
+        vm_cls = old_vm.__class__
+        host_cls = old_vm.node.__class__
+        params = old_vm.node.params.copy()
+        for p in ['ip', 'mac', 'cores']:
+            if p in params:
+                del params[p]
+        params['inNamespace'] = old_vm.node.inNamespace
+        #params['cls'] = old_vm.node.__class__
         
-        # self.not_implemented()
-        if new_name == None:          
-            new_name = vm_name + '.cp'
-            while new_name in self.nameToComp:
-                new_name = new_name + '.cp'
-              
-        else:
-            if new_name in self.nameToComp:
-                return "ERROR: name has existed already"  
-        print new_name           
-        host = self.createVM(new_name, cls = cls, **params)
-        # @GLY
-        vm_new = self.vm_cls(host, self.config_folder)
-        vm_old = self.nameToComp.get(vm_name)
-        vm_old.cloneto(vm_new)
-        return host
+        new_vm = self.createVM(new_vm_name, vm_cls, host_cls, **params)
+        assert isinstance(new_vm, VirtualMachine)
+        old_vm.cloneTo(new_vm)     # Leave complexity in here.
+
+        return new_vm
 
     def launchVM( self, vm_name, hv_name=None ):
         "Initialize the created VM on a hypervisor."
