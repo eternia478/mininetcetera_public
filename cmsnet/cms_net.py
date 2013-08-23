@@ -546,20 +546,21 @@ class CMSnet( object ):
 
 
 
-    def createVM( self, vm_name, vm_cls=None, host_cls=None, **params ):
+    def createVM( self, vm_name, vm_script=None, vm_cls=None, **params ):
         "Create a virtual machine image."
         if self.debug_flag1:
-            args = (vm_name, vm_cls, host_cls, params)
+            args = (vm_name, vm_script, vm_cls, params)
             print "EXEC: createVM(%s, %s, %s, %s):" % args
 
         assert vm_name not in self.nameToComp
         assert not vm_cls or issubclass(vm_cls, VirtualMachine)
-        assert not host_cls or issubclass(host_cls, Host)
 
-        host = self._createHostAtDummy(vm_name, cls=host_cls, **params)
+        # TODO: Handle vm_script (assert and passing in).
+
+        host = self._createHostAtDummy(vm_name, **params)
         if not vm_cls:
             vm_cls = self.vm_cls
-        vm = vm_cls(host, self.config_folder) #vm_script
+        vm = vm_cls(host, self.config_folder)
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm
 
@@ -581,15 +582,15 @@ class CMSnet( object ):
         assert isinstance(old_vm, VirtualMachine)
 
         vm_cls = old_vm.__class__
-        host_cls = old_vm.node.__class__
+        vm_script = None
         params = old_vm.node.params.copy()
         for p in ['ip', 'mac', 'cores']:
             if p in params:
                 del params[p]
+        params['cls'] = old_vm.node.__class__
         params['inNamespace'] = old_vm.node.inNamespace
-        #params['cls'] = old_vm.node.__class__
-        
-        new_vm = self.createVM(new_vm_name, vm_cls, host_cls, **params)
+
+        new_vm = self.createVM(new_vm_name, vm_script, vm_cls, **params)
         assert isinstance(new_vm, VirtualMachine)
         old_vm.cloneTo(new_vm)     # Leave complexity in here.
 

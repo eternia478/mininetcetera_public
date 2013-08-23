@@ -167,15 +167,18 @@ class CMSCLI( Cmd ):
     # CMS Main Commands (ZZZ)
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
-    def _check_vm_name( self, vm_name, exp_exist=True, exp_running=True ):
+    def _check_vm_name( self, vm_name, exp_exist=True, exp_running=None ):
         """
         Checks the correctness of the VM of the given name.
 
-        vm_name: Name of the VM image
+        vm_name: Name of the VM image. If None, ignore and return.
         exp_exist: Expected result of existing or not.
         exp_running: Expected result of running or not. None if not matter.
         Returns True if error occured, False otherwise.
         """
+        if not vm_name:      # Ignore if not set by input.
+            return False     # NOTE: Already handled at parsing.
+
         in_cn = vm_name in self.cn
         comp = self.cn[vm_name] if in_cn else None
         is_VM = isinstance(comp, VirtualMachine)
@@ -243,7 +246,7 @@ class CMSCLI( Cmd ):
 
         return err
 
-    def do_add( self, line ):
+    def do_add( self, line, cmd_name='add' ):
         "Create a virtual machine image."
         args = line.split()
         vm_name = None
@@ -256,18 +259,16 @@ class CMSCLI( Cmd ):
         elif len(args) == 2:
             vm_name = args[0]
             vm_script = args[1]
-        elif len(args) == 3:
-            vm_name = args[0]
-            vm_script = args[1]
-            vm_ip = args[2]
         else:
-            error('invalid number of args: add vm_name [vm_script [vm_ip]]\n')
+            usage = '%s vm_name [vm_script]' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
 
-        err = self._check_vm_name(vm_name, exp_exist=False, exp_running=None)
+        err = self._check_vm_name(vm_name, exp_exist=False)
+        # TODO: Check vm_script value.
         
         if not err:
-            self.cn.createVM(vm_name)
+            self.cn.createVM(vm_name, vm_script)
 
     def do_cp( self, line, cmd_name='cp' ):
         "Clone a virtual machine image."
@@ -285,13 +286,13 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1 = self._check_vm_name(old_vm_name, exp_exist=True, exp_running=None)
-        err2 = self._check_vm_name(new_vm_name, exp_exist=False, exp_running=None)
+        err1 = self._check_vm_name(old_vm_name, exp_exist=True)
+        err2 = self._check_vm_name(new_vm_name, exp_exist=False)
 
         if not err1 and not err2:
             self.cn.cloneVM(old_vm_name, new_vm_name)
 
-    def do_launch( self, line ):
+    def do_launch( self, line, cmd_name='launch' ):
         "Initialize the created VM on a hypervisor."
         args = line.split()
         vm_name = None
@@ -303,7 +304,8 @@ class CMSCLI( Cmd ):
             vm_name = args[0]
             hv_name = args[1]
         else:
-            error('invalid number of args: launch vm_name [hv_name]\n')
+            usage = '%s vm_name [hv_name]' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
 
         err1 = self._check_vm_name(vm_name, exp_exist=True, exp_running=False)
@@ -312,7 +314,7 @@ class CMSCLI( Cmd ):
         if not err1 and not err2:
             self.cn.launchVM(vm_name, hv_name)
 
-    def do_mv( self, line ):
+    def do_mv( self, line, cmd_name='mv' ):
         "Migrate a running image to another hypervisor."
         args = line.split()
         vm_name = None
@@ -322,7 +324,8 @@ class CMSCLI( Cmd ):
             vm_name = args[0]
             hv_name = args[1]
         else:
-            error('invalid number of args: mv vm_name hv_name\n')
+            usage = '%s vm_name hv_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
 
         err1 = self._check_vm_name(vm_name, exp_exist=True, exp_running=True)
@@ -331,7 +334,7 @@ class CMSCLI( Cmd ):
         if not err1 and not err2:
             self.cn.migrateVM(vm_name, hv_name)
 
-    def do_stop( self, line ):
+    def do_stop( self, line, cmd_name='stop' ):
         "Stop a running image."
         args = line.split()
         vm_name = None
@@ -339,7 +342,8 @@ class CMSCLI( Cmd ):
         if len(args) == 1:
             vm_name = args[0]
         else:
-            error('invalid number of args: stop vm_name\n')
+            usage = '%s vm_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
 
         err = self._check_vm_name(vm_name, exp_exist=True, exp_running=True)
@@ -347,7 +351,7 @@ class CMSCLI( Cmd ):
         if not err:
             self.cn.stopVM(vm_name)
 
-    def do_rm( self, line ):
+    def do_rm( self, line, cmd_name='rm' ):
         "Remove the virtual machine image from the hypervisor."
         args = line.split()
         vm_name = None
@@ -355,7 +359,8 @@ class CMSCLI( Cmd ):
         if len(args) == 1:
             vm_name = args[0]
         else:
-            error('invalid number of args: rm vm_name\n')
+            usage = '%s vm_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
 
         err = self._check_vm_name(vm_name, exp_exist=True, exp_running=False)
@@ -363,7 +368,7 @@ class CMSCLI( Cmd ):
         if not err:
             self.cn.deleteVM(vm_name)
 
-    def do_mode( self, line ):
+    def do_mode( self, line, cmd_name='mode' ):
         "Change the mode of VM distribution across hypervisors."
         args = line.split()
         vm_dist_mode = None
@@ -384,7 +389,8 @@ class CMSCLI( Cmd ):
                 return
             vm_dist_limit = int(args[1])
         else:
-            error('invalid number of args: mode [dist_mode [dist_limit]]\n')
+            usage = '%s [dist_mode [dist_limit]]' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
 
         if vm_dist_mode not in self.cn.possible_modes:
@@ -400,7 +406,7 @@ class CMSCLI( Cmd ):
 
         self.cn.changeVMDistributionMode(vm_dist_mode, vm_dist_limit)
 
-    def do_enable( self, line ):
+    def do_enable( self, line, cmd_name='enable' ):
         "Enable a hypervisor."
         args = line.split()
         hv_name = None
@@ -408,7 +414,8 @@ class CMSCLI( Cmd ):
         if len(args) == 1:
             hv_name = args[0]
         else:
-            error('invalid number of args: enable hv_name\n')
+            usage = '%s hv_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
 
         err = self._check_hv_name(hv_name, exp_enabled=False)
@@ -416,7 +423,7 @@ class CMSCLI( Cmd ):
         if not err:
             self.cn.enableHV(hv_name)
 
-    def do_disable( self, line ):
+    def do_disable( self, line, cmd_name='disable' ):
         "Disable a hypervisor."
         args = line.split()
         hv_name = None
@@ -424,7 +431,8 @@ class CMSCLI( Cmd ):
         if len(args) == 1:
             hv_name = args[0]
         else:
-            error('invalid number of args: disable hv_name\n')
+            usage = '%s hv_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
 
         err = self._check_hv_name(hv_name, exp_enabled=True)
@@ -439,22 +447,22 @@ class CMSCLI( Cmd ):
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
     def do_create( self, line ):
-        self.do_add(line)
-
-    def do_start( self, line ):
-        self.do_launch(line)
-
-    def do_migrate( self, line ):
-        self.do_mv(line)
-
-    def do_move( self, line ):
-        self.do_mv(line)
-
-    def do_delete( self, line ):
-        self.do_rm(line)
+        self.do_add(line, cmd_name='create')
 
     def do_clone( self, line ):
-        self.do_cp(line)
+        self.do_cp(line, cmd_name='clone')
+
+    def do_start( self, line ):
+        self.do_launch(line, cmd_name='start')
+
+    def do_migrate( self, line ):
+        self.do_mv(line, cmd_name='migrate')
+
+    def do_move( self, line ):
+        self.do_mv(line, cmd_name='move')
+
+    def do_delete( self, line ):
+        self.do_rm(line, cmd_name='delete')
 
 
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
