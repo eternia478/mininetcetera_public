@@ -406,6 +406,20 @@ class CMSCLI( Cmd ):
 
         self.cn.changeVMDistributionMode(vm_dist_mode, vm_dist_limit)
 
+    def do_level (self, line):
+        args = line.split()
+        msglevel = None
+        if len(args) == 1:
+            msglevel = args[0]
+        else:
+            error('invalid number of args: level msglevel\n')
+            return
+        
+        if msglevel not in self.cn.possible_level:  # TODO: FIXME
+            error('No such msglevel: %s\n' % msglevel)
+            return
+        self.cn.changeLevel(msglevel) 
+
     def do_enable( self, line, cmd_name='enable' ):
         "Enable a hypervisor."
         args = line.split()

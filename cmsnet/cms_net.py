@@ -126,7 +126,8 @@ class CMSnet( object ):
     def __init__( self, vm_dist_mode="random", vm_dist_limit=10,
                   new_config=False, config_folder=".",
                   net_cls=Mininet, vm_cls=VirtualMachine, hv_cls=Hypervisor,
-                  controller_ip="127.0.0.1", controller_port=7790, **params):
+                  controller_ip="127.0.0.1", controller_port=7790, msglevel =
+                  None, **params):
         """Create Mininet object.
            vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
            vm_dist_limit: Limit of number of VMs on hypervisors in packed mode
@@ -154,6 +155,8 @@ class CMSnet( object ):
         self.controller_socket = None
         #self.possible_modes = ["packed", "sparse", "random"]
         self.possible_modes = self.getPossibleVMDistModes()
+        self.msglevel = msglevel
+        self.possible_level = {"instantiated","migrated","destroyed"}
         self.last_HV = None
 
         if not new_config:
@@ -279,6 +282,7 @@ class CMSnet( object ):
         config["hv_cls"] = self.hv_cls.__name__
         config["controller_ip"] = self.controller_ip
         config["controller_port"] = self.controller_port
+        config["msglevel"] = self.msglevel
 
         topo = self.mn.topo
         if topo:
@@ -352,6 +356,8 @@ class CMSnet( object ):
         "Send a CMS message to the controller."
         msg = {
           'CHANNEL' : 'CMS',
+          'msglevel': self.msglevel,
+          'cmd' : cmd_type,
           #'cmd_type' : cmd_type,  # TODO: Implement me.
           'host' : vm.name,
           'new_hv': vm.hv_name
@@ -618,7 +624,7 @@ class CMSnet( object ):
         self._moveLink(vm.node, hv.node)
         vm.launch(hv)
         self.last_HV = hv
-        self.send_msg_to_controller("launch", vm)
+        self.send_msg_to_controller("instantiated", vm)
 
     def migrateVM( self, vm_name, hv_name ):
         "Migrate a running image to another hypervisor."
@@ -636,7 +642,7 @@ class CMSnet( object ):
 
         self._moveLink(vm.node, hv.node)
         vm.moveTo(hv)
-        self.send_msg_to_controller("migrate", vm)
+        self.send_msg_to_controller("migrated", vm)
 
     def stopVM( self, vm_name ):
         "Stop a running image."
@@ -650,7 +656,7 @@ class CMSnet( object ):
 
         vm.stop()
         self._removeLink(vm.node)
-        self.send_msg_to_controller("stop", vm)
+        self.send_msg_to_controller("destroyed", vm)
 
     def deleteVM( self, vm_name ):
         "Remove the virtual machine image from the hypervisor."
@@ -705,6 +711,16 @@ class CMSnet( object ):
         if vm_dist_mode == "packed" and vm_dist_limit:
             assert vm_dist_limit > 0
             self.vm_dist_limit = vm_dist_limit
+
+    def changeLevel( self, msglevel):
+        "Change the msglevel."
+        if self.debug_flag1:
+            print "EXEC: changeLevel(%s):" % msglevel
+        
+        assert msglevel in self.possible_level
+        
+        self.msglevel = msglevel
+        self.update_net_config() 
 
     def enableHV( self, hv_name ):
         "Enable a hypervisor."
