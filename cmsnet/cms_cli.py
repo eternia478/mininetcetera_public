@@ -462,6 +462,28 @@ class CMSCLI( Cmd ):
         if not err:
             self.cn.disableHV(hv_name)
 
+    def do_qstart( self, line ):
+        "Combination of add and launch."
+        args = line.split()
+        vm_name = None
+        hv_name = None
+
+        if len(args) == 1:
+            vm_name = args[0]
+        elif len(args) == 2:
+            vm_name = args[0]
+            hv_name = args[1]
+        else:
+            usage = '%s vm_name [hv_name]' % "qstart"
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err1 = self._check_vm_name(vm_name, exp_exist=False)
+        err2 = self._check_hv_name(hv_name, exp_enabled=True)
+
+        if not err1 and not err2:
+            self.do_add(vm_name)
+            self.do_launch(line)
 
 
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
@@ -477,14 +499,23 @@ class CMSCLI( Cmd ):
     def do_start( self, line ):
         self.do_launch(line, cmd_name='start')
 
+    def do_instantiate( self, line ):
+        self.do_launch(line, cmd_name='instantiate')
+
     def do_migrate( self, line ):
         self.do_mv(line, cmd_name='migrate')
 
     def do_move( self, line ):
         self.do_mv(line, cmd_name='move')
 
+    def do_destroy( self, line ):
+        self.do_stop(line, cmd_name='destroy')
+
     def do_delete( self, line ):
         self.do_rm(line, cmd_name='delete')
+
+    
+
 
 
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
