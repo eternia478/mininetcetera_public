@@ -1,34 +1,64 @@
-1. Finish main functions in net.py
-  - [DONE] createVM
-  - [DONE] launchVM
-  - [DONE] migrateVM
-  - [DONE] stopVM
-  - cloneVM
-2. Clean up get_hypervisors and other beta stuff in net.py
-3. Implement VM distribution modes. [This one is maybe a big task.]
-  - Need to unify distribution modes. Maybe have a completely different
-    file do this? A dictionary that points to different classes, each which
-    points to a list that Mininet sets?
-  - VMScheduler class, and we pass its name or something. Invoke when hv_name
-    is actually None.
-4. Figure out how to get this method to completely work in net.py
-  - deleteVM
-     - Stuff like xterms and such aren't properly shutdown until
-       Mininet itself shuts down. I doubt we can just shut the entire
-       thing down and there is no way to access it beforehand. Maybe
-       we should have CMSComponents see this item (or just the VM).
-5. Add the extra functionalities in cli.py (has to do with scripts)
-  - do_add
-  - do_cp
-6. [DONE] Add aliases to cli.py (not important for now).
-7. [DONE] Rewrite moveLink and such? (default interfaces when None?)
-8. Figure out some stuff for the comp.py [This one is also a big task.]
-  - Setting starting and stopping scripts for VMs
-  - Enabling and disabling hypervisors (not complete right now). 
-9. Rewrite comp.py repr functions.
-10. Clean up comments (a lot still refer to Mininet). This one is not important.
-11. Clean up stuff (dummy?)
-12. Json parsing fix (for config file).
+[COMPLEX]
+1. Finish deleteVM
+  - Stuff like xterms and such aren't properly shutdown until
+    Mininet itself shuts down. I doubt we can just shut the entire
+    thing down and there is no way to access it beforehand. Maybe
+    we should have CMSComponents see this item (or just the VM).
+2. Implement the VM script system
+3. Finish implementing enabling/disabling of hypervisors
+  - Maybe we should make an evictVMs function that just removes everything,
+    and then have disable call this as well as disabling the hypervisor?
+  - At the same time, implement hypervisor config handling.
+4. Finish implementing handling of CMS messages (finish mininet_service.py)
+5. Figure out a way for resumed configurations without a Topo class to restart
+   all VMs and hypervisors correctly
+  - We need to preserve the hypervisor identities (names), so some info must
+    be preserved here.
+  - Unfortunately, there is no way to know the number of switches set up or
+    the topology they hold. Maybe there should be a check upon starting that
+    checks this with the hypervisor configurations, and assume that any conflict
+    in config info would suggest a completely new configuration for CMSnet
+  - Also have --new_config ignore previous component configurations as well.
+6. Make a cleaner API later.
+  - Details unclear, but hopefuly more like Murphy's example.
 
-13. Mininet updating (need to request first a push with POXSwitch onto there).
-14. Mininet updating (moveLink, etc.)
+
+[SIMPLE]
+1. Test get_hypervisors_beta and consider making it the official version.
+2. Rewrite component repr() methods and do_dump() in CLI
+3. Rewrite comments and docstrings.
+  - Mostly, change stuff referring to Mininet to CMSnet
+4. Clean up unnecessary dummy usage in cms executable
+
+
+[LATER]
+1. Mininet node updating (need to request first a push with POXSwitch).
+  - Note that this also includes updating clean.py and the mn executable
+2. Mininet net updating (moveLink, etc.)
+
+
+[INCOMPLETE]
+1. Finish main functions other than deleteVM:
+  - createVM
+    - cli: Implement more options as input
+    - net: Accept more options and handle vm_script input
+    - comp: Accept vm_script as input
+  - cloneVM   (net, comp)
+    - net: Extract vm_script (leave complexity in comp?)
+    - comp: Copy vm_script file, consider other info params in node
+  - Some parts may require finishing the VM script system
+
+
+[DONE]
+1. Rewrite moveLink and others to get default interfaces if input name is None.
+2. Add extra aliases to the CLI for each command.
+3. Finish main functions other than deleteVM:
+  - launchVM
+  - migrateVM
+  - stopVM
+4. Implement VM distribution mode handling in launchVM
+  - In the end, these modes did not become classes but rather methods.
+5. Implement CMS message level at controller.
+
+
+
