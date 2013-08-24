@@ -78,7 +78,7 @@ class POXSwitch( Switch ):
         Switch.__init__(self, name, dpid, listenPort=listenPort, **params)
 
         self.print_personal_debug = False
-
+        print "iiiiiiiiiiiiiiiiiiii"
         ps = "Args: "
         ps += "\n  name           \t"      + str(name)
         ps += "\n  control_flag   \t"      + str(control_flag)
@@ -96,7 +96,6 @@ class POXSwitch( Switch ):
         if 'POX_CORE_DIR' not in os.environ:
             #exit( 'exiting; please set missing POX_CORE_DIR env var' )
             self.poxCoreDir = "/home/mininet/pox"
-            warn("POX_CORE_DIR is not set.")
         else:
             self.poxCoreDir = os.environ[ 'POX_CORE_DIR' ]
 
@@ -117,6 +116,8 @@ class POXSwitch( Switch ):
         self.command = ""
         self.intf_ports = []
         self.pox_pid = None
+        # @GLY
+        self.lastPid = None
         self.started_switch = False
 
         ps = "Input to POXSwitch.__init__(): "
@@ -132,7 +133,8 @@ class POXSwitch( Switch ):
         ps += "\n  extra_parameters\t"      + str(self.extra)
         ps += "\n  listenPort      \t"      + str(self.listenPort)
         if self.print_personal_debug: print ps
-
+        # self._run_pox_switch()
+        
     def _build_cmd_args( self ):
         "Build command-line argument of POX."
         self.run_file = ""
@@ -169,20 +171,42 @@ class POXSwitch( Switch ):
         self.command += " " + self.cmd_args
         self.command += " " + self.cmd_tail
         if self.print_personal_debug: print "EVAL: " + self.command
-
+        # @GLY
+        
+        
+        
+        
     def _run_pox_switch( self ):
-        "Run the POX switch"
         if self.pox_pid is not None:
             warn( "Killing old pox switch to restart new one." )
             self._kill_pox_switch()
         self._build_cmd_args()
         self.cmd( self.command, printPid=True )
         self.pox_pid = self.lastPid
+        print "MY POX PIDDDDDDDDDD: "+str(self.pox_pid)
+        self.started_switch = True
+        return
+        "Run the POX switch"
+        # @GLY
+        print "running !"
+        if self.pox_pid is not None:
+            print "poxid is not none"
+            warn( "Killing old pox switch to restart new one." )
+            self.lastPid = self.pox_pid
+            self._kill_pox_switch()
+            self.pox_pid = self.lastPid
+        else:
+            self.pox_pid = 1
+            print "yyyyyyyyyyyyyyyy"
+        self._build_cmd_args()
+        self.cmd( self.command, printPid=True )
+        
         self.started_switch = True
 
     def _kill_pox_switch( self ):
         "Kill the POX switch"
         if self.pox_pid is None:
+            print "llllllllll"
             error( "No pox switch process to kill" )
             return
         if self.print_personal_debug: print "KILL: process %d" % self.pox_pid
@@ -264,6 +288,6 @@ class POXNormalSwitch( POXSwitch ):
     def __init__( self, name, **params):
         params.update({"inNamespace":True})
         POXSwitch.__init__(self, name, control_flag=True,
-                           control_type="forwarding.hub", **params)
+                           control_type="forwarding.l2_pairs", **params)
 
 

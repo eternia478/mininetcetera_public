@@ -43,13 +43,9 @@ class CMSComponent( object ):
         """
         assert isinstance(node, Node)
         assert isinstance(config_folder, basestring)
-        self._node = node
-        self._config_folder = config_folder
-        self._have_comp_config = False
-
-    @property
-    def node( self ):
-        return self._node
+        self.node = node
+        self.config_folder = config_folder
+        self.have_comp_config = False
 
     @property
     def name( self ):
@@ -62,7 +58,8 @@ class CMSComponent( object ):
         except:
             pass
         self.node.name = name
-        self.update_comp_config()
+        if self.have_comp_config:
+            self.update_comp_config()
 
     def __repr__( self ):
         "More informative string representation"
@@ -76,7 +73,7 @@ class CMSComponent( object ):
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
         # NOTE: This should be overridden.
-        return self._config_folder+"/"+self.name+".config_cmscomp"
+        return self.config_folder+"/"+self.name+".config_cmscomp"
 
     def check_comp_config( self ):
         "Check for any previous configurations and adjust if necessary."
@@ -95,7 +92,7 @@ class VirtualMachine( CMSComponent ):
 
     vm_uuid = 0  # UNUSED: For ID purposes? Maybe name is enough.
 
-    def __init__( self, node, config_folder=".", tenant_id=1 ):
+    def __init__( self, node, config_folder="." ):
         """
         Intialization
 
@@ -105,24 +102,15 @@ class VirtualMachine( CMSComponent ):
         assert isinstance(node, Host)
         CMSComponent.__init__( self, node, config_folder )
 
-        self._hv = None
-        self.start_script = ""   # CHECK: Should these be modifiable?
+        self.hv = None
+        self.start_script = ""
         self.stop_script = ""
-        self._tenant_id = tenant_id
-
+        # @ unnecessary : could be obtained through self.hv.node.name...
         self.config_hv_name = None   # temp holder for HV name in config
         self.check_comp_config()
-        self._have_comp_config = True
-        if not self.config_hv_name:  # Do not overwrite original running status
-            self.update_comp_config()
-
-    @CMSComponent.name.setter
-    def name( self, name ):
-        old_name = self.name
-        CMSComponent.name.fset(self, name)
-        if self._hv:
-            del self._hv.nameToVMs[old_name]
-            self._hv.nameToVMs[self.name] = self
+        self.update_comp_config()
+        self.have_comp_config = True
+        self.tenentID = None
 
     @property
     def IP( self ):
@@ -131,7 +119,8 @@ class VirtualMachine( CMSComponent ):
     @IP.setter
     def IP( self, ip ):
         self.node.setIP(ip)
-        self.update_comp_config()
+        if self.have_comp_config:
+            self.update_comp_config()
 
     @property
     def MAC( self ):
@@ -140,33 +129,14 @@ class VirtualMachine( CMSComponent ):
     @MAC.setter
     def MAC( self, mac ):
         self.node.setMAC(mac)
-        self.update_comp_config()
-
-    @property
-    def hv( self ):
-        return self._hv
-
-    @hv.setter
-    def hv( self, hv ):
-        if self._hv:
-            del self._hv.nameToVMs[self.name]
-        self._hv = hv
-        if self._hv:
-            self._hv.nameToVMs[self.name] = self
-            assert self.is_running()
-        else:
-            assert not self.is_running()
-        self.update_comp_config()
+        if self.have_comp_config:
+            self.update_comp_config()
 
     @property
     def hv_name( self ):
         if isinstance(self.hv, Hypervisor):
             return self.hv.name
         return None
-
-    @property
-    def tenant_id( self ):
-        return self._tenant_id
 
     def __repr__( self ):
         "More informative string representation"
@@ -175,8 +145,10 @@ class VirtualMachine( CMSComponent ):
 
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
-        return self._config_folder+"/"+self.name+".config_vm"
-
+        return self.config_folder+"/"+self.name+".config_vm"
+    
+    
+    
     def check_comp_config( self ):
         "Check for any previous configurations and adjust if necessary."
         # See http://stackoverflow.com/questions/14574518/
@@ -193,12 +165,10 @@ class VirtualMachine( CMSComponent ):
                         setattr(self, attr, config[attr])
                 f.close()                
         except IOError as e:
-            info("No config exists for VM %s\n" % self.name)
+            info("No config exists for VM %s" % self.name)
 
     def update_comp_config( self ):
         "Update the configurations for this component."
-        if not self._have_comp_config:
-            return
         f = open(self.get_config_file_name(), "w")
         config = {}
         config["IP"] = self.IP
@@ -206,7 +176,6 @@ class VirtualMachine( CMSComponent ):
         config["start_script"] = self.start_script
         config["stop_script"] = self.stop_script
         config["config_hv_name"] = self.hv_name
-        config["_tenant_id"] = self._tenant_id
         f.write(json.dumps(config))
         f.flush()
         f.close()
@@ -215,42 +184,46 @@ class VirtualMachine( CMSComponent ):
         "Test if this VM image is running (or inactive) on any hypervisor."
         return self.hv_name is not None
 
-    def cloneTo( self, new_vm ):
-        "Clone information from this VM to the new VM image."
-        assert new_vm is not None
-        assert isinstance(new_vm, VirtualMachine)
-        assert not new_vm.is_running()
-        new_vm.start_script = self.start_script
-        new_vm.stop_script = self.stop_script
-        new_vm._tenant_id = self.tenant_id
-        # FIXME: Copy script image files in file system.
-
     def launch( self, hv ):
         "Initialize the VM on the input hypervisor."
         assert not self.is_running()
-        assert hv is not None
         assert hv.is_enabled()
+
         self.hv = hv
+        self.hv.nameToVMs[self.name] = self
+
+        if self.have_comp_config:
+            self.update_comp_config()
         self.node.cmd(self.start_script)
 
     def moveTo( self, hv ):
         "Migrate the VM to the new input hypervisor."
         assert self.is_running()
-        assert hv is not None
         assert hv.is_enabled()
+
+        del self.hv.nameToVMs[self.name]
         self.hv = hv
+        self.hv.nameToVMs[self.name] = self
+
+        if self.have_comp_config:
+            self.update_comp_config()
 
     def stop( self ):
         "Stop running the VM."
         assert self.is_running()
+
+        del self.hv.nameToVMs[self.name]
         self.hv = None
+
+        if self.have_comp_config:
+            self.update_comp_config()
         self.node.cmd(self.stop_script)
 
     def shutdown( self ):
         "Shutdown VM when CMSnet is shutting down."
         if not self.is_running():
             return
-        self._have_comp_config = False  # Prevent adjustments to config file.
+        self.have_comp_config = False  # Prevent adjustments to config file.
         self.stop()
 
 
@@ -258,7 +231,7 @@ class Hypervisor( CMSComponent ):
     """A hypervisor that virtual machines run on. A wrapper class for the
        Switch class."""
 
-    def __init__( self, node, config_folder=".", vm_dist_limit=None):
+    def __init__( self, node, config_folder="." , vm_limit = None):
         """
         Intialization
 
@@ -270,50 +243,18 @@ class Hypervisor( CMSComponent ):
 
         self.nameToVMs = {}   # UNUSED: mapping for VMs in this hypervisor
         self._enabled = True
-        self._vm_dist_limit = vm_dist_limit
-
-        self.check_comp_config()
-        self._have_comp_config = True
-        self.update_comp_config()
-
-    @CMSComponent.name.setter
-    def name( self, name ):
-        CMSComponent.name.fset(self, name)
-        for vm in self.nameToVMs.values():
-            vm.update_comp_config()
-
-    @property
-    def vm_dist_limit( self ):
-        return self._vm_dist_limit
-
-    @vm_dist_limit.setter
-    def vm_dist_limit( self, vm_dist_limit ):
-        self._vm_dist_limit = vm_dist_limit
-        self.update_comp_config()
+        if vm_limit == None:
+            self.vm_limit = 10
+        else:
+            self.vm_limit = vm_limit
 
     def __repr__( self ):
         "More informative string representation"
         # TODO: This should be different.
         return repr(self.node)
 
-    def get_config_file_name( self ):
-        "Return the file name of the configuration file."
-        return self._config_folder+"/"+self.name+".config_hv"
-
-    def check_comp_config( self ):
-        "Check for any previous configurations and adjust if necessary."
-        # TODO: Implement me.
-        pass
-
-    def update_comp_config( self ):
-        "Update the configurations for this component."
-        # TODO: Implement me.
-        pass
-
-    def get_num_VMs( self ):
-        "Return the number of VMs running on this hypervisor."
-        return len(self.nameToVMs)
-
+    ## hv did not need a config file!
+    ## Not concise at all!!!
     def is_enabled( self ):
         "Test if this hypervisor is enabled to run VMs or not."
         return self._enabled
@@ -322,13 +263,11 @@ class Hypervisor( CMSComponent ):
         "Enable the hypervisor to run VMs."
         assert not self.is_enabled()
         self._enabled = True
-        self.update_comp_config()
 
     def disable( self ):
         "Disable the hypervisor from running VMs."
         assert self.is_enabled()
         self._enabled = False
-        self.update_comp_config()
 
 
 

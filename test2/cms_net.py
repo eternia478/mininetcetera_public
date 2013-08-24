@@ -1,91 +1,3 @@
-"""
-
-    Mininet: A simple networking testbed for OpenFlow/SDN!
-
-author: Bob Lantz (rlantz@cs.stanford.edu)
-author: Brandon Heller (brandonh@stanford.edu)
-
-Mininet creates scalable OpenFlow test networks by using
-process-based virtualization and network namespaces.
-
-Simulated hosts are created as processes in separate network
-namespaces. This allows a complete OpenFlow network to be simulated on
-top of a single Linux kernel.
-
-Each host has:
-
-A virtual console (pipes to a shell)
-A virtual interfaces (half of a veth pair)
-A parent shell (and possibly some child processes) in a namespace
-
-Hosts have a network interface which is configured via ifconfig/ip
-link/etc.
-
-This version supports both the kernel and user space datapaths
-from the OpenFlow reference implementation (openflowswitch.org)
-as well as OpenVSwitch (openvswitch.org.)
-
-In kernel datapath mode, the controller and switches are simply
-processes in the root namespace.
-
-Kernel OpenFlow datapaths are instantiated using dpctl(8), and are
-attached to the one side of a veth pair; the other side resides in the
-host namespace. In this mode, switch processes can simply connect to the
-controller via the loopback interface.
-
-In user datapath mode, the controller and switches can be full-service
-nodes that live in their own network namespaces and have management
-interfaces and IP addresses on a control network (e.g. 192.168.123.1,
-currently routed although it could be bridged.)
-
-In addition to a management interface, user mode switches also have
-several switch interfaces, halves of veth pairs whose other halves
-reside in the host nodes that the switches are connected to.
-
-Consistent, straightforward naming is important in order to easily
-identify hosts, switches and controllers, both from the CLI and
-from program code. Interfaces are named to make it easy to identify
-which interfaces belong to which node.
-
-The basic naming scheme is as follows:
-
-    Host nodes are named h1-hN
-    Switch nodes are named s1-sN
-    Controller nodes are named c0-cN
-    Interfaces are named {nodename}-eth0 .. {nodename}-ethN
-
-Note: If the network topology is created using mininet.topo, then
-node numbers are unique among hosts and switches (e.g. we have
-h1..hN and SN..SN+M) and also correspond to their default IP addresses
-of 10.x.y.z/8 where x.y.z is the base-256 representation of N for
-hN. This mapping allows easy determination of a node's IP
-address from its name, e.g. h1 -> 10.0.0.1, h257 -> 10.0.1.1.
-
-Note also that 10.0.0.1 can often be written as 10.1 for short, e.g.
-"ping 10.1" is equivalent to "ping 10.0.0.1".
-
-Currently we wrap the entire network in a 'mininet' object, which
-constructs a simulated network based on a network topology created
-using a topology object (e.g. LinearTopo) from mininet.topo or
-mininet.topolib, and a Controller which the switches will connect
-to. Several configuration options are provided for functions such as
-automatically setting MAC addresses, populating the ARP table, or
-even running a set of terminals to allow direct interaction with nodes.
-
-After the network is created, it can be started using start(), and a
-variety of useful tasks maybe performed, including basic connectivity
-and bandwidth tests and running the mininet CLI.
-
-Once the network is up and running, test code can easily get access
-to host and switch objects which can then be used for arbitrary
-experiments, typically involving running a series of commands on the
-hosts.
-
-After all desired tests or activities have been completed, the stop()
-method may be called to shut down the network.
-
-"""
-
 import os
 import re
 import select
@@ -95,15 +7,14 @@ from itertools import chain
 
 from mininet.cli import CLI
 from mininet.log import info, warn, error, debug, output
-from mininet.node import Host, Switch#, POXNormalSwitch
+from mininet.node import Host, Switch
 from mininet.link import Link, Intf
 from mininet.util import quietRun, fixLimits, numCores, ensureRoot, moveIntf
 from mininet.util import macColonHex, ipStr, ipParse, netParse, ipAdd
+
 from mininet.term import cleanUpScreens, makeTerms
 from mininet.net import Mininet
-
 from cmsnet.cms_comp import CMSComponent, VirtualMachine, Hypervisor
-import random
 import socket
 import json
 defaultDecoder = json.JSONDecoder()
@@ -114,7 +25,7 @@ import cmsnet.cms_comp
 import cmsnet.cms_topo
 
 # Patching. REMOVE AFTER CHANGES TO MININET AND UNCOMMENT ABOVE EDIT.
-from cmsnet.mininet_node_patch import Dummy, POXNormalSwitch
+from mininet_node_patch import Dummy, POXNormalSwitch
 
 
 # Mininet version: should be consistent with README and LICENSE
@@ -123,43 +34,35 @@ VERSION = "2.0.0.i.x.beta"
 class CMSnet( object ):
     "Network emulation with hosts spawned in network namespaces."
 
-    def __init__( self, new_config=False, config_folder=".",
-                  vm_dist_mode="random", vm_dist_limit=10, msg_level="all",
+    def __init__( self, vm_dist_mode="random",
+                  new_config=False, config_folder=".",
                   net_cls=Mininet, vm_cls=VirtualMachine, hv_cls=Hypervisor,
                   controller_ip="127.0.0.1", controller_port=7790, **params):
         """Create Mininet object.
+           vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
            new_config: True if we are using brand new configurations.
            config_folder: Folder where configuration files are saved/loaded.
-           vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
-           vm_dist_limit: Limit of number of VMs on hypervisors in packed mode
-           msg_level: CMS message handling level at controller
            net_cls: Mininet class.
            vm_cls: VM class.
            hv_cls: Hypervisor class.
            controller_ip = IP to connect to for the controller socket.
            controller_port = Port to connect to for the controller socket.
            params: extra paramters for Mininet"""
-        self.new_config = new_config
-        self.config_folder = config_folder
         self.vm_dist_mode = vm_dist_mode
-        self.vm_dist_limit = vm_dist_limit
-        self.msg_level = msg_level
+        self.config_folder = config_folder
         self.net_cls = net_cls
         self.vm_cls = vm_cls
         self.hv_cls = hv_cls
         self.controller_ip = controller_ip
         self.controller_port = controller_port
         self.params = params
-
         self.VMs = []
         self.HVs = []
-        self.nameToComp = {}   # name to CMSComponent (VM/HV) objects 
-        self.last_HV = None
+        self.nameToComp = {}   # name to CMSComponent (VM/HV) objects
         self.controller_socket = None
-        self.possible_modes = CMSnet.getPossibleVMDistModes()
-        self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
-
-        if not self.new_config:
+        self.possible_modes = ["packed", "sparse", "random"]
+        
+        if not new_config:
             self.check_net_config()
         self.mn = self.net_cls(**params)
         self.update_net_config()
@@ -216,20 +119,25 @@ class CMSnet( object ):
     def start( self ):
         "Start Mininet, hypervisors, and a connection to the controller."
         self._tempStartDummy()
-        self.mn.start()
+        # @ GLY
+        self.mn.build()
+        # self.mn.start()
         self.get_hypervisors()
-        self.get_old_VMs()
+        # we did not delete VM when we just shutdown or something, so we need not to recreate them
+        # self.get_old_VMs()
         self.setup_controller_connection()
 
     def stop( self ):
         "Stop Mininet, VMs, and the connection to the controller."
-        self.close_controller_connection()
         info( '*** Stopping %i VMs\n' % len( self.VMs ) )
+        # @GLY 
         for vm in self.VMs:
-            vm.shutdown()
+            self.stopVM( vm.node.name )
         self.mn.stop()
         self._tempStopDummy()
-
+        # @GLY
+        self.close_controller_connection()
+        
     def run( self, test, *args, **kwargs ):
         "Perform a complete start/test/stop cycle."
         self.start()
@@ -241,11 +149,19 @@ class CMSnet( object ):
     def check_net_config( self ):
         "Check for any previous CMSnet configurations and adjust if necessary."
         try:
-            with open(self.config_folder+"/cn.config_cmsnet", "r") as f:
+            with open(self.config_folder+"/cm.config_cmsnet", "r") as f:
                 config_raw = f.read()
+                # print "raw is: ",config_raw
+                
+                
+                
                 config = {}
                 if config_raw:
                     config, l = defaultDecoder.raw_decode(config_raw)
+                    # print config 
+                    # print l
+                    
+                    
                 for attr in config:
                     if attr.startswith("topo"):       # Handle separately.
                         pass
@@ -259,8 +175,15 @@ class CMSnet( object ):
                         setattr(self, attr, str(config[attr]))
                     else:
                         setattr(self, attr, config[attr])
+                #print config
+             
+                # @GLY
                 topo_cls_name = config.get("topo_cls")
+                # print type(topo_cls_name)
+                # print topo_cls_name
+                
                 if topo_cls_name:
+                    # print "tag 1"
                     topo_cls = getattr(cmsnet.cms_topo, topo_cls_name)
                     topo_opts = config.get("topo_opts", {})
                     topo = topo_cls(**topo_opts)
@@ -273,11 +196,12 @@ class CMSnet( object ):
 
     def update_net_config( self ):
         "Update the CMSnet configurations file."
-        f = open(self.config_folder+"/cn.config_cmsnet", "w")
+        
+        # print "flag 2"
+        
+        f = open(self.config_folder+"/cm.config_cmsnet", "w")
         config = {}
         config["vm_dist_mode"] = self.vm_dist_mode
-        config["vm_dist_limit"] = self.vm_dist_limit
-        config["msg_level"] = self.msg_level
         config["net_cls"] = self.net_cls.__name__
         config["vm_cls"] = self.vm_cls.__name__
         config["hv_cls"] = self.hv_cls.__name__
@@ -285,16 +209,26 @@ class CMSnet( object ):
         config["controller_port"] = self.controller_port
 
         topo = self.mn.topo
+        
+        # print "mn.topo is ", topo
+        
+        topo_opts = {}
         if topo:
-            topo_opts = {}
             topo_opts["hv_num"] = topo.hv_num
             topo_opts["fb_num"] = topo.fb_num
             topo_opts["hopts"] = topo.hopts
             topo_opts["sopts"] = topo.sopts
             topo_opts["lopts"] = topo.lopts
+        # @GLY
+        if topo:
             config["topo_cls"] = topo.__class__.__name__
-            config["topo_opts"] = topo_opts
-
+       
+        # print "topocls_name : ",topo.__class__.__name__
+        
+        
+        config["topo_opts"] = topo_opts
+        # @GLY: why must we use the JSON
+        # f.write(config)
         f.write(json.dumps(config))
         f.flush()
         f.close()
@@ -302,7 +236,7 @@ class CMSnet( object ):
     def get_hypervisors( self ):
         "Collect all hypervisors."
         # HV don't need loading. Just attach to switch.
-        if self.vm_dist_mode:
+        if not self.vm_dist_mode:
             self.get_hypervisors_beta()
             return
         if self.mn.topo is not None:
@@ -313,9 +247,11 @@ class CMSnet( object ):
                 self.HVs.append(hv)
                 self.nameToComp[ hv_name ] = hv
         else:
-            print "Sorry, we don't support hacky approaches. Muahaha!"
-            print "Please leave a topo after the beep. BEEEEEEEP!"
+            return
+            # print "Sorry, we don't support hacky approaches. Muahaha!"
+            # print "Please leave a topo after the beep. BEEEEEEEP!"
 
+    """
     def get_old_VMs( self ):
         "Collect all previously saved VMs."
         # I want to use glob here instead...
@@ -328,12 +264,15 @@ class CMSnet( object ):
                 vm_name = file_name[:-10]
                 self.createVM(vm_name)
                 vm = self.nameToComp[ vm_name ]
-                if vm.config_hv_name:
-                    self.launchVM( vm_name, vm.config_hv_name )
+                # if vm.config_hv_name:
+                # @GLY
+                if vm.hv.node.name:
+                    self.launchVM( vm_name, vm.hv.node.name )
                     if not vm.is_running():
                         err = True
         if err:
             error("\nError occurred when resuming VMs!\n")
+    """
 
     def setup_controller_connection( self ):
         "Start the connection to the controller."
@@ -349,29 +288,8 @@ class CMSnet( object ):
     def close_controller_connection( self ):
         "Close the connection to the controller."
         if self.controller_socket:
-            try:
-                self.controller_socket.shutdown(socket.SHUT_RDWR)
-            except:
-                pass  # If other side already shut down, leave it.
             self.controller_socket.close()
             self.controller_socket = None
-
-    def send_msg_to_controller(self, cmd_type, vm):
-        "Send a CMS message to the controller."
-        msg = {
-          'CHANNEL'   : 'CMS',
-          'cmd'       : cmd_type,
-          'msg_level' : self.msg_level,
-          'host'      : vm.name,
-          'new_hv'    : vm.hv_name
-        }
-        if self.controller_socket:
-            self.controller_socket.send(json.dumps(msg))
-
-    @classmethod
-    def getPossibleCMSMsgLevels( cls ):
-        "Dynamically obtain all possible message levels for the controller."
-        return ["all", "instantiated", "migrated", "destroyed", "none"]
 
 
 
@@ -390,9 +308,9 @@ class CMSnet( object ):
         # HV don't need loading. Just attach to switch.
         # Default? In case added more nodes after topo...
         for node_name in self.mn.nameToNode:
-            node = self.mn.nameToNode[node_name]
+            node = self.mn.nameToNode[hv_name]
             if node.params.get("cms_type") == "hypervisor":
-                hv = self.hv_cls( node, self.config_folder)
+                hv = hv_cls( node, self.config_folder)
                 self.HVs.append(hv)
                 self.nameToComp[ node_name ] = hv
 
@@ -402,11 +320,16 @@ class CMSnet( object ):
            cls: custom switch class/constructor (optional)
            returns: added switch
            side effect: params has extra parameter cmsnet."""
-        if self.built:
+        if self.mn.built:
             error("Cannot add switch; Mininet already built.")
             return
         params.update({"cms_net": "hypervisor"})
-        return self.mn.addSwitch(name, cls=cls, **params)
+        # @GLY
+        sw = self.mn.addSwitch(name, cls=cls, **params)
+        hv = self.hv_cls(sw)
+        self.HVs.append(hv)
+        self.nameToComp[ name ] = hv
+        return sw
 
     def addFabricSwitch( self, name, **params ):
         """Add fabric-switch. FOR TESTING PURPOSES ONLY.
@@ -414,140 +337,18 @@ class CMSnet( object ):
            cls: custom switch class/constructor (optional)
            returns: added switch
            side effect: params has extra parameter cmsnet."""
-        if self.built:
+        if self.mn.built:
             error("Cannot add switch; Mininet already built.")
             return
-        params.update({"cms_net": "fabric", "cls": POXNormalSwitch})
+        # @GLY -- Pox normal switch has not been completed
+        params.update({"cms_net": "fabric", })  #"cls": POXNormalSwitch
         return self.mn.addSwitch(name, **params)
 
 
-
-
-
-
-
-  
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
-    # CMS VM Distribution Mode Handling
+    # File system
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
-
-    def _getNextDefaultHVName( self ):
-        "Using the distribution mode, get the next default hv_name"
-        if len(self.HVs) == 0:
-            error_msg = "No hypervisor exists"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
-            return
-        vm_dist_handler = getattr(self, "_vm_dist_" + self.vm_dist_mode, None)
-        if not vm_dist_handler:
-            error_msg = "VM distribution mode %s invalid" % self.vm_dist_mode
-            error("\nCannot get hv_name: %s.\n" % error_msg)
-            return
-        hv_name = vm_dist_handler()
-        return hv_name
-
-    @classmethod
-    def getPossibleVMDistModes( cls ):
-        "Dynamically obtain all possible VM distribution mode names."
-        vm_dist_prefix = "_vm_dist_"
-        method_list = dir(cls)   #cls.__dict__  # dir(cls)
-        dist_mode_names = []
-        for method in method_list:
-            if method.startswith(vm_dist_prefix):
-                mode_name = method[len(vm_dist_prefix):]
-                dist_mode_names.append( mode_name )
-        #get_mode_name = lambda method: method[len(vm_dist_prefix):]
-        #is_dist_mode = lambda method: method.startswith(vm_dist_prefix)
-        #dist_mode_names =map(get_mode_name, filter(is_dist_mode, method_list))
-        return dist_mode_names
-
-    def isHVFull( self, hv ):
-        "Check if hypervisor has reached its VM capacity limit (packed mode)."
-        hv_limit = hv.vm_dist_limit
-        limit = hv_limit if hv_limit else self.vm_dist_limit
-        return len(hv.nameToVMs) >= limit
-
-    def _efficientPackedDistMode( self ):
-        "UNUSED. An efficient version of the packed mode (loops only once)."
-        temp_num = 0
-        hv_name = None
-        for hv in self.HVs:   # Somehow, while loops suck (not in C?)
-            vm_num = len(hv.nameToVMs)
-            if vm_num >= temp_num:
-                if not self.isHVFull(hv):
-                    temp_num = vm_num
-                    hv_name = hv.name
-        if hv_name is None:
-            error_msg = "No hypervisor is available"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
-            return
-        return hv_name
-
-    def _vm_dist_random( self ):
-        "Choose a random HV."
-        rand_hv = random.choice(self.HVs)
-        return rand_hv.name
-
-    def _vm_dist_sparse( self ):
-        "Choose HVs sparsely and evenly."
-        min_hv = min(self.HVs, key=lambda hv: len(hv.nameToVMs))
-        return min_hv.name
-
-    def _vm_dist_packed( self ):
-        "Choose HVs so that VMs are packed together."
-        # return self._efficientPackedDistMode()
-        avail_hvs = [hv for hv in self.HVs if not self.isHVFull(hv)]
-        if len(avail_hvs) == 0:
-            error_msg = "No hypervisor is available"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
-            return
-        max_hv = max(avail_hvs, key=lambda hv: len(hv.nameToVMs))
-        return max_hv.name
-
-    def _vm_dist_same( self ):
-        "Choose an HV the same as the last chosen one."
-        if not self.last_HV:
-            error_msg = "No hypervisor last chosen"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
-            return
-        same_hv = self.last_HV
-        return same_hv.name
-
-    def _vm_dist_different( self ):
-        "Choose a random HV different from the last chosen one."
-        if not self.last_HV:
-            error_msg = "No hypervisor last chosen"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
-            return
-        diff_hv = random.choice([hv for hv in self.HVs if hv != self.last_HV])
-        return diff_hv.name
-
-    def _vm_dist_next( self ):
-        "Choose HVs in a cycle."
-        if not self.last_HV:
-            error_msg = "No hypervisor last chosen"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
-            return
-        last_hv_index = self.HVs.index(self.last_HV)
-        next_hv_index = (last_hv_index + 1) % len(self.HVs)
-        next_hv = self.HVs[next_hv_index]
-        return next_hv.name
-
-    def _vm_dist_previous( self ):
-        "Choose HVs in a cycle, rotating in reverse."
-        if not self.last_HV:
-            error_msg = "No hypervisor last chosen"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
-            return
-        last_hv_index = self.HVs.index(self.last_HV)
-        prev_hv_index = (last_hv_index - 1) % len(self.HVs)
-        prev_hv = self.HVs[prev_hv_index]
-        return prev_hv.name
-
-
-
-
-
-
+    
 
 
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
@@ -561,65 +362,30 @@ class CMSnet( object ):
 
 
 
-    def createVM( self, vm_name, vm_script=None, vm_cls=None, **params ):
+    def createVM( self, vm_name, cls = None, **params ):
         "Create a virtual machine image."
         if self.debug_flag1:
-            args = (vm_name, vm_script, vm_cls, params)
-            print "EXEC: createVM(%s, %s, %s, %s):" % args
+            print "EXEC: createVM(%s):" % vm_name
 
         assert vm_name not in self.nameToComp
-        assert not vm_cls or issubclass(vm_cls, VirtualMachine)
 
-        # TODO: Handle vm_script (assert and passing in).
-
-        host = self._createHostAtDummy(vm_name, **params)
-        if not vm_cls:
-            vm_cls = self.vm_cls
-        vm = vm_cls(host, self.config_folder)
+        # self.not_implemented()
+        host = self._createHostAtDummy(vm_name, cls = cls, **params)
+        # @GLY
+        vm = self.vm_cls(host, self.config_folder)
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm
+        
+        
+        
+        
+        return host
 
-        return vm
 
-    def cloneVM( self, old_vm_name, new_vm_name=None ):
-        "Clone a virtual machine image."
-        if self.debug_flag1:
-            print "EXEC: cloneVM(%s, %s):" % (old_vm_name, new_vm_name)
-
-        if new_vm_name is None:          
-            new_vm_name = old_vm_name
-            while new_vm_name in self.nameToComp:
-                new_vm_name += ".cp"
-
-        assert old_vm_name in self.nameToComp
-        assert new_vm_name not in self.nameToComp
-        old_vm = self.nameToComp.get(old_vm_name)
-        assert isinstance(old_vm, VirtualMachine)
-
-        vm_cls = old_vm.__class__
-        vm_script = None
-        params = old_vm.node.params.copy()
-        for p in ['ip', 'mac', 'cores']:
-            if p in params:
-                del params[p]
-        params['cls'] = old_vm.node.__class__
-        params['inNamespace'] = old_vm.node.inNamespace
-
-        new_vm = self.createVM(new_vm_name, vm_script, vm_cls, **params)
-        assert isinstance(new_vm, VirtualMachine)
-        old_vm.cloneTo(new_vm)     # Leave complexity in here.
-
-        return new_vm
-
-    def launchVM( self, vm_name, hv_name=None ):
+    def launchVM( self, vm_name, hv_name ):
         "Initialize the created VM on a hypervisor."
         if self.debug_flag1:
             print "EXEC: launchVM(%s, %s):" % (vm_name, hv_name)
-
-        if hv_name == None:
-            hv_name = self._getNextDefaultHVName()
-            if hv_name == None:  # Some error occurred.
-                return           # Return and do nothing.
 
         assert vm_name in self.nameToComp
         assert hv_name in self.nameToComp
@@ -630,11 +396,37 @@ class CMSnet( object ):
         assert not vm.is_running()
         assert hv.is_enabled()
 
-        self._moveLink(vm.node, hv.node)
-        vm.launch(hv)
-        self.last_HV = hv
-        self.send_msg_to_controller("instantiated", vm)
-
+        # self.not_implemented()
+        
+        dummy = self.mn.nameToNode.get("dummy", None)
+        
+        for intf in vm.node.intfs.values():
+          print "old link: ", intf.link
+          if intf.link.intf1 == intf: 
+            vm_intf = intf
+            old_intf = intf.link.intf2
+            # print "Old node is: ", old_intf.node
+                      
+          if intf.link.intf2 == intf:
+            vm_intf = intf 
+            old_intf = intf.link.intf1
+            # print "Old node is: ", old_intf.node             
+        vm_intf_name =  intf.name
+        self._moveLink(vm.node, hv.node, vm_intf_name)
+        print "new link: ", vm_intf.link
+        
+        # print "New node is: ", old_intf.node
+        vm.launch(hv)  
+      
+        "Sending msg to comtroller"
+        msg = {
+          'CHANNEL' : 'CMS',
+          'host' : vm_name,
+           #'old_hv': old_intf.node.name,
+          'new_hv': hv_name
+        }      
+        self.controller_socket.send(json.dumps(msg))       
+        
     def migrateVM( self, vm_name, hv_name ):
         "Migrate a running image to another hypervisor."
         if self.debug_flag1:
@@ -649,9 +441,36 @@ class CMSnet( object ):
         assert vm.is_running()
         assert hv.is_enabled()
 
-        self._moveLink(vm.node, hv.node)
+        # self.not_implemented()
+        
+          
+        for intf in vm.node.intfs.values():
+          print "old link: ", intf.link
+          if intf.link.intf1 == intf:
+            vm_intf = intf
+            ## old_intf = intf.link.intf2
+            ## print "Old node is: ", old_intf.node
+          if intf.link.intf2 == intf:
+            vm_intf = intf
+            ## old_intf = intf.link.intf1
+            ## print "Old node is: ", old_intf.node
+        
+        vm_intf_name = vm_intf.name
+        self._moveLink(vm.node, hv.node, vm_intf_name)
+        print "new link: ", vm_intf.link
+        # print "New node is: ", old_intf.node
         vm.moveTo(hv)
-        self.send_msg_to_controller("migrated", vm)
+        
+        "Sending msg to comtroller"
+        msg = {
+          'CHANNEL' : 'CMS',
+          'host' : vm_name,
+          ## 'old_hv':  old_intf.node.name,
+          'new_hv': hv_name
+        }
+        self.controller_socket.send(json.dumps(msg))       
+
+       
 
     def stopVM( self, vm_name ):
         "Stop a running image."
@@ -661,11 +480,40 @@ class CMSnet( object ):
         assert vm_name in self.nameToComp
         vm = self.nameToComp.get(vm_name)
         assert isinstance(vm, VirtualMachine)
-        assert vm.is_running()
+        # @GLY
+        if not vm.is_running():
+            return
+        #assert vm.is_running()
 
-        vm.stop()
-        self._removeLink(vm.node)
-        self.send_msg_to_controller("destroyed", vm)
+        # self.not_implemented()
+        
+        dummy = self.mn.nameToNode.get("dummy", None)
+        for intf in vm.node.intfs.values():
+          print "old link: ", intf.link
+          if intf.link.intf1 == intf:
+            vm_intf = intf
+            ## old_intf = intf.link.intf2
+            ## print "Old node is: ", old_intf.node
+          if intf.link.intf2 == intf:
+            vm_intf = intf
+            ## old_intf = intf.link.intf1
+            ## print "Old node is: ", old_intf.node
+        vm_intf_name = vm_intf.name
+        self._removeLink(vm.node, vm_intf_name)
+        print "new link: ", vm_intf.link
+        vm.stop() 
+        
+        "Sending msg to comtroller"
+        msg = {
+          'CHANNEL' : 'CMS',
+          'host' : vm_name,
+          ## 'old_hv': old_node.name,
+          'new_hv': dummy.name,
+        }
+        self.controller_socket.send(json.dumps(msg))       
+        
+        
+       
 
     def deleteVM( self, vm_name ):
         "Remove the virtual machine image from the hypervisor."
@@ -688,12 +536,8 @@ class CMSnet( object ):
         vm.node.terminate()
         # Remove the file
         os.remove(vm.get_config_file_name()) 
-
+        
         """
-        # NOTE: many details on this one is hard to do, so
-        #  we'll leave it for now. We need to remove intfs, processes,
-        #  xterms, and do a bunch of stuff. 
-
         self.stopVM(vm_name)
         vm = self.nameToComp[vm_name]
         self.VMs.remove(vm)
@@ -705,32 +549,31 @@ class CMSnet( object ):
 
         # TODO: Remove file!
         """
+        
+    def cloneVM( self, vm1_name, vm2_name ):
+        "Clone a virtual machine image."
+        if self.debug_flag1:
+            print "EXEC: cloneVM(%s):" % vm_name
 
-    def changeVMDistributionMode( self, vm_dist_mode, vm_dist_limit=None ):
+        assert vm1_name in self.nameToComp
+        assert vm2_name not in self.nameToComp
+        vm1 = self.nameToComp.get(vm1_name)
+        assert isinstance(vm1, VirtualMachine)
+
+        self.not_implemented()
+        
+
+    def changeVMDistributionMode( self, vm_dist_mode ):
         "Change the mode of VM distribution across hypervisors."
         if self.debug_flag1:
-            args = (vm_dist_mode, vm_dist_limit)
-            print "EXEC: changeVMDistributionMode(%s, %s):" % args
+            print "EXEC: changeVMDistributionMode(%s):" % vm_dist_mode
 
         assert vm_dist_mode in self.possible_modes
 
         self.vm_dist_mode = vm_dist_mode
-        if vm_dist_mode == "packed" and vm_dist_limit:
-            assert vm_dist_limit > 0
-            self.vm_dist_limit = vm_dist_limit
         self.update_net_config()
 
-    def changeCMSMsgLevel( self, msg_level ):
-        "Change the level of CMS message handling at the controller."
-        if self.debug_flag1:
-            print "EXEC: changeCMSMsgLevel(%s):" % msg_level
-        
-        assert msg_level in self.possible_levels
-        
-        self.msg_level = msg_level
-        self.update_net_config()
-
-    def enableHV( self, hv_name ):
+    def enableHV( self, hv_name ):  ##???
         "Enable a hypervisor."
         if self.debug_flag1:
             print "EXEC: enableHV(%s):" % hv_name
@@ -751,7 +594,6 @@ class CMSnet( object ):
         hv = self.nameToComp.get(hv_name)
         assert isinstance(hv, Hypervisor) 
         assert hv.is_enabled()
-
         hv.disable()
 
 
@@ -796,7 +638,7 @@ class CMSnet( object ):
     def _tempStartDummy(self):
         info( '\n*** Adding dummy:\n' )
         dummy = self._addDummy()
-        self.mn.terms += makeTerms( [dummy], 'dummy' )
+        # self.mn.terms += makeTerms( [dummy], 'dummy' )
 
     def _tempStopDummy(self):
         info( '\n' )
@@ -820,25 +662,27 @@ class CMSnet( object ):
         self.mn.nameToNode[ name ] = dummy_new
         return dummy_new
 
-    def _createHostAtDummy( self, hostName, **params ):
+    def _createHostAtDummy( self, hostName , **params):
         """
         Add a host node to Mininet and link it to the dummy.
 
         hostName: name of the host
-        params: parameters for host
         """
         if self.debug_flag1:
             print "EXEC: createHostAtDummy(%s):" % hostName
 
         # Part 0: Main assertions.
         assert hostName not in self.mn.nameToNode
-        assert self.mn.built
+        # @GLY
+        # assert self.mn.built
 
         # Part 1: Getting dummy.
         dummy = self.mn.nameToNode.get("dummy", None)
         if dummy is None:
             error('dummy node does not exist\n')
-            return
+            # return
+            # @ GLY
+            dummy = self._addDummy()
         assert isinstance(dummy, Dummy)
 
         # The following corresponds to code in self.build()
@@ -846,8 +690,8 @@ class CMSnet( object ):
         # if self.topo:
         #     self.buildFromTopo( self.topo )
         info( '*** Adding host: %s\n' % hostName )
-        host = self.mn.addHost( hostName, **params )
-        info( '*** Adding link: (%s, %s)\n' % ( host.name, dummy.name ) )
+        host = self.mn.addHost( hostName )
+        info( '*** Adding link: (%s, %s) ' % ( host.name, dummy.name ) )
         hostPort = host.newPort()
         dummyPort = dummy.newPort()
         self.mn.addLink( host, dummy, hostPort, dummyPort )
