@@ -349,6 +349,10 @@ class CMSnet( object ):
     def close_controller_connection( self ):
         "Close the connection to the controller."
         if self.controller_socket:
+            try:
+                self.controller_socket.shutdown(socket.SHUT_RDWR)
+            except:
+                pass  # If other side already shut down, leave it.
             self.controller_socket.close()
             self.controller_socket = None
 
