@@ -123,25 +123,27 @@ VERSION = "2.0.0.i.x.beta"
 class CMSnet( object ):
     "Network emulation with hosts spawned in network namespaces."
 
-    def __init__( self, vm_dist_mode="random", vm_dist_limit=10,
-                  new_config=False, config_folder=".",
+    def __init__( self, new_config=False, config_folder=".",
+                  vm_dist_mode="random", vm_dist_limit=10, msg_level="all",
                   net_cls=Mininet, vm_cls=VirtualMachine, hv_cls=Hypervisor,
-                  controller_ip="127.0.0.1", controller_port=7790, msglevel =
-                  None, **params):
+                  controller_ip="127.0.0.1", controller_port=7790, **params):
         """Create Mininet object.
-           vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
-           vm_dist_limit: Limit of number of VMs on hypervisors in packed mode
            new_config: True if we are using brand new configurations.
            config_folder: Folder where configuration files are saved/loaded.
+           vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
+           vm_dist_limit: Limit of number of VMs on hypervisors in packed mode
+           msg_level: CMS message handling level at controller
            net_cls: Mininet class.
            vm_cls: VM class.
            hv_cls: Hypervisor class.
            controller_ip = IP to connect to for the controller socket.
            controller_port = Port to connect to for the controller socket.
            params: extra paramters for Mininet"""
+        self.new_config = new_config
+        self.config_folder = config_folder
         self.vm_dist_mode = vm_dist_mode
         self.vm_dist_limit = vm_dist_limit
-        self.config_folder = config_folder
+        self.msg_level = msg_level
         self.net_cls = net_cls
         self.vm_cls = vm_cls
         self.hv_cls = hv_cls
@@ -151,15 +153,13 @@ class CMSnet( object ):
 
         self.VMs = []
         self.HVs = []
-        self.nameToComp = {}   # name to CMSComponent (VM/HV) objects
-        self.controller_socket = None
-        #self.possible_modes = ["packed", "sparse", "random"]
-        self.possible_modes = self.getPossibleVMDistModes()
-        self.msglevel = msglevel
-        self.possible_level = {"instantiated","migrated","destroyed"}
+        self.nameToComp = {}   # name to CMSComponent (VM/HV) objects 
         self.last_HV = None
+        self.controller_socket = None
+        self.possible_modes = CMSnet.getPossibleVMDistModes()
+        self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
 
-        if not new_config:
+        if not self.new_config:
             self.check_net_config()
         self.mn = self.net_cls(**params)
         self.update_net_config()
@@ -277,12 +277,12 @@ class CMSnet( object ):
         config = {}
         config["vm_dist_mode"] = self.vm_dist_mode
         config["vm_dist_limit"] = self.vm_dist_limit
+        config["msg_level"] = self.msg_level
         config["net_cls"] = self.net_cls.__name__
         config["vm_cls"] = self.vm_cls.__name__
         config["hv_cls"] = self.hv_cls.__name__
         config["controller_ip"] = self.controller_ip
         config["controller_port"] = self.controller_port
-        config["msglevel"] = self.msglevel
 
         topo = self.mn.topo
         if topo:
@@ -355,15 +355,20 @@ class CMSnet( object ):
     def send_msg_to_controller(self, cmd_type, vm):
         "Send a CMS message to the controller."
         msg = {
-          'CHANNEL' : 'CMS',
-          'msglevel': self.msglevel,
-          'cmd' : cmd_type,
-          #'cmd_type' : cmd_type,  # TODO: Implement me.
-          'host' : vm.name,
-          'new_hv': vm.hv_name
+          'CHANNEL'   : 'CMS',
+          'cmd'       : cmd_type,
+          'msg_level' : self.msg_level,
+          'host'      : vm.name,
+          'new_hv'    : vm.hv_name
         }
         if self.controller_socket:
             self.controller_socket.send(json.dumps(msg))
+
+    @classmethod
+    def getPossibleCMSMsgLevels( cls ):
+        "Dynamically obtain all possible message levels for the controller."
+        return ["all", "instantiated", "migrated", "destroyed", "none"]
+
 
 
 
@@ -706,21 +711,20 @@ class CMSnet( object ):
         assert vm_dist_mode in self.possible_modes
 
         self.vm_dist_mode = vm_dist_mode
-        self.update_net_config()
-
         if vm_dist_mode == "packed" and vm_dist_limit:
             assert vm_dist_limit > 0
             self.vm_dist_limit = vm_dist_limit
+        self.update_net_config()
 
-    def changeLevel( self, msglevel):
-        "Change the msglevel."
+    def changeCMSMsgLevel( self, msg_level ):
+        "Change the level of CMS message handling at the controller."
         if self.debug_flag1:
-            print "EXEC: changeLevel(%s):" % msglevel
+            print "EXEC: changeCMSMsgLevel(%s):" % msg_level
         
-        assert msglevel in self.possible_level
+        assert msg_level in self.possible_levels
         
-        self.msglevel = msglevel
-        self.update_net_config() 
+        self.msg_level = msg_level
+        self.update_net_config()
 
     def enableHV( self, hv_name ):
         "Enable a hypervisor."

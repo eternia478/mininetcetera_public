@@ -380,7 +380,7 @@ class CMSCLI( Cmd ):
                 out_str += "\tvm_dist_limit: %s" % self.cn.vm_dist_limit
             output(out_str+"\n")
             return
-        if len(args) == 1:
+        elif len(args) == 1:
             vm_dist_mode = args[0]
         elif len(args) == 2:
             vm_dist_mode = args[0]
@@ -406,19 +406,27 @@ class CMSCLI( Cmd ):
 
         self.cn.changeVMDistributionMode(vm_dist_mode, vm_dist_limit)
 
-    def do_level (self, line):
+    def do_level( self, line, cmd_name='level' ):
+        "Change the level of CMS message handling at the controller."
         args = line.split()
-        msglevel = None
-        if len(args) == 1:
-            msglevel = args[0]
+        msg_level = None
+
+        if len(args) == 0:
+            out_str = "msg_level: %s" % self.cn.msg_level
+            output(out_str+"\n")
+            return
+        elif len(args) == 1:
+            msg_level = args[0]
         else:
-            error('invalid number of args: level msglevel\n')
+            usage = '%s msg_level' % cmd_name
+            error('invalid number of args: %s\n' % usage)
             return
-        
-        if msglevel not in self.cn.possible_level:  # TODO: FIXME
-            error('No such msglevel: %s\n' % msglevel)
+
+        if msg_level not in self.cn.possible_levels:
+            error('No such CMS message level: %s\n' % msg_level)
             return
-        self.cn.changeLevel(msglevel) 
+
+        self.cn.changeCMSMsgLevel(msg_level)
 
     def do_enable( self, line, cmd_name='enable' ):
         "Enable a hypervisor."
