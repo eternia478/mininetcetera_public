@@ -338,9 +338,9 @@ class CMSnet( object ):
     def setup_controller_connection( self ):
         "Start the connection to the controller."
         # Change self.controller_socket from None to the actual socket.
+        ip = self.controller_ip
+        port = self.controller_port
         try:
-            ip = self.controller_ip
-            port = self.controller_port
             sock = socket.create_connection((ip, port))
             self.controller_socket = sock
         except Exception,e:
@@ -366,7 +366,11 @@ class CMSnet( object ):
           'new_hv'    : vm.hv_name
         }
         if self.controller_socket:
-            self.controller_socket.send(json.dumps(msg))
+            try:
+                self.controller_socket.send(json.dumps(msg))
+            except Exception,e:
+                warn("\nCannot send to controller: %s\n" % str(e))
+            
 
     @classmethod
     def getPossibleCMSMsgLevels( cls ):
@@ -794,9 +798,10 @@ class CMSnet( object ):
 
 
     def _tempStartDummy(self):
-        info( '\n*** Adding dummy:\n' )
+        info( '*** Adding dummy\n' )
         dummy = self._addDummy()
-        self.mn.terms += makeTerms( [dummy], 'dummy' )
+        if self.mn.xterms:
+            self.mn.terms += makeTerms( [dummy], 'dummy' )
 
     def _tempStopDummy(self):
         info( '\n' )
@@ -804,6 +809,7 @@ class CMSnet( object ):
         dummy = self.mn.nameToNode.get("dummy")
         info( dummy.name + ' ' )
         dummy.terminate()
+        info( '\n*** Done\n' )
 
 
 
