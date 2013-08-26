@@ -164,88 +164,171 @@ class CMSCLI( Cmd ):
 
 
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
-    # CMS Main Commands (ZZZ)
+    # CMS Command Argument Checks
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
-    def _check_vm( self, name, exp_exist=True, exp_running=None ):
-        #check_vm( self, name, exp_exist=True, exp_run=None, exp_pause=None ):
+    def _check_vm_name_available( self, vm_name ):
         """
-        Checks the correctness of the VM of the given name.
+        Check availability of name for a new VM.
 
-        name: Name of the VM image. If None, ignore and return.
-        exp_exist: Expected result of existing or not.
+        vm_name: Name of VM image. If None, ignore and return.
+        Returns True if error occured, False otherwise.
+        """
+        if not vm_name:     # Ignore NoneType names
+            return False
+
+        if vm_name in self.cn:
+            comp = self.cn[vm_name]
+            if isinstance(comp, VirtualMachine):
+                error('VM of the same name %s already exists\n' % vm_name)
+            elif isinstance(comp, Hypervisor):
+                error('%s is a hypervisor\n' % vm_name)
+            else:
+                error('%s is another type of component\n' % vm_name)
+            return True
+
+        return False
+
+    def _check_vm_status( self, vm, exp_running=None ):
+        """
+        Check conditions for an existing VM.
+
+        vm: VM image instance. If None, ignore and return.
         exp_running: Expected result of running or not. None if not matter.
         Returns True if error occured, False otherwise.
         """
-        if not name:               # Ignore if not set by input.
-            return False, None     # NOTE: Already handled at parsing.
+        if not vm:          # Ignore NoneType instances
+            return False
 
-        in_cn = name in self.cn
-        comp = self.cn[name] if in_cn else None
-        is_VM = isinstance(comp, VirtualMachine)
-        is_HV = isinstance(comp, Hypervisor)
-        err = False
+        if not isinstance(vm, VirtualMachine):
+            if isinstance(vm, Hypervisor):
+                error('%s is a hypervisor\n' % vm.name)
+            else:
+                error('%s is another type of component\n' % vm.name)
+            return True
 
-        if is_HV:
-            error('%s is a hypervisor\n' % name)
-            err = True
-        elif in_cn and not any([is_VM, is_HV]):
-            error('%s is another type of component\n' % name)
-            err = True
-        elif not is_VM and exp_exist:
-            error('No such VM image %s\n' % name)
-            err = True
-        elif is_VM:
-            if not exp_exist:
-                error('VM of the same name %s already exists\n' % name)
-                err = True
-            elif exp_running is not None:
-                vm_run = comp.is_running()
-                if not vm_run and exp_running:
-                    error('VM %s is currently inactive\n' % name)
-                    err = True
-                elif vm_run and not exp_running:
-                    error('VM %s is currently running\n' % name)
-                    err = True
+        vm_running = vm.is_running()
+        if exp_running is not None:
+            if not vm_running and exp_running:
+                error('VM %s is currently inactive\n' % vm.name)
+                return True
+            elif vm_running and not exp_running:
+                error('VM %s is currently running\n' % vm.name)
+                return True
 
-        return err, comp
+        return False
 
-    def _check_hv( self, name, exp_enabled=True ):
+    def _check_vm_status_beta( self, vm, exp_running=None, exp_paused=None ):
         """
-        Checks the correctness of the hypervisor of the given name.
+        Check conditions for an existing VM.
 
-        name: Name of the hypervisor. If None, ignore and return.
-        exp_enabled: Expected result of HV enabled or not.
+        vm: VM image instance. If None, ignore and return.
+        exp_running: Expected result of running or not. None if not matter.
+        exp_paused: Expected result of paused or not. None if not matter.
         Returns True if error occured, False otherwise.
         """
+        if not vm:          # Ignore NoneType instances
+            return False
+
+        if not isinstance(vm, VirtualMachine):
+            if isinstance(vm, Hypervisor):
+                error('%s is a hypervisor\n' % vm.name)
+            else:
+                error('%s is another type of component\n' % vm.name)
+            return True
+
+        vm_running = vm.is_running()
+        vm_paused = vm.is_paused()
+        if exp_running is not None:
+            if not vm_running and exp_running:
+                error('VM %s is currently inactive\n' % vm.name)
+                return True
+            elif vm_running and not exp_running:
+                error('VM %s is currently running\n' % vm.name)
+                return True
+        if exp_paused is not None and vm_running:
+            assert exp_running
+            if not vm_paused and exp_paused:
+                error('VM %s is currently running\n' % vm.name)
+                return True
+            elif vm_paused and not exp_paused:
+                error('VM %s is currently paused\n' % vm.name)
+                return True
+
+        return False
+
+    def _check_hv_status( self, hv, exp_enabled=None ):
+        """
+        Check conditions for a hypervisor.
+
+        hv: VM image instance. If None, ignore and return.
+        exp_enabled: Expected result of HV enabled or not. None if not matter.
+        Returns True if error occured, False otherwise.
+        """
+        if not hv:          # Ignore NoneType instances
+            return False
+
+        if not isinstance(hv, Hypervisor):
+            if isinstance(hv, VirtualMachine):
+                error('%s is a VM image\n' % hv.name)
+            else:
+                error('%s is another type of component\n' % hv.name)
+            return True
+
+        hv_enabled = hv.is_enabled()
+        if exp_enabled is not None:
+            if not hv_enabled and exp_enabled:
+                error('Hypervisor %s is currently disabled\n' % hv.name)
+                return True
+            elif hv_enabled and not exp_enabled:
+                error('Hypervisor %s is currently enabled\n' % hv.name)
+                return True
+
+        return False
+
+    def _check_vm( self, name, exp_exist=True, exp_running=None ):
         if not name:               # Ignore if not set by input.
             return False, None     # NOTE: Already handled at parsing.
 
-        in_cn = name in self.cn
-        comp = self.cn[name] if in_cn else None
-        is_VM = isinstance(comp, VirtualMachine)
-        is_HV = isinstance(comp, Hypervisor)
-        err = False
+        if not exp_exist:
+            err = self._check_vm_name_available(name)
+            vm = None
+            return err, vm
 
-        if is_VM:
-            error('%s is a VM image\n' % name)
-            err = True
-        elif in_cn and not any([is_VM, is_HV]):
-            error('%s is another type of component\n' % name)
-            err = True
-        elif not is_HV:
+        if name not in self.cn:
+            error('No such VM image %s\n' % name)
+            return True, None
+        vm = self.cn[name]
+        err = self._check_vm_status(vm, exp_running=exp_running)
+        return err, vm
+
+
+    def _check_hv( self, name, exp_enabled=True ):
+        if not name:               # Ignore if not set by input.
+            return False, None     # NOTE: Already handled at parsing.
+
+        if name not in self.cn:
             error('No such hypervisor %s\n' % name)
-            err = True
-        elif is_HV:
-            hv_enb = comp.is_enabled()
-            if not hv_enb and exp_enabled:
-                error('Hypervisor %s is currently disabled\n' % name)
-                err = True
-            elif hv_enb and not exp_enabled:
-                error('Hypervisor %s is currently enabled\n' % name)
-                err = True
+            return True, None
+        hv = self.cn[name]
+        err = self._check_hv_status(hv, exp_enabled=exp_enabled)
+        return err, hv
 
-        return err, comp
+
+
+
+
+
+
+
+
+
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS Main Commands (ZZZ)
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
 
     def do_add( self, line, cmd_name='add' ):
         "Create a virtual machine image."
@@ -266,6 +349,7 @@ class CMSCLI( Cmd ):
             return
 
         err, comp = self._check_vm(vm_name, exp_exist=False)
+        #err = self._check_vm_name_available(vm_name)
         # TODO: Check vm_script value.
         
         if not err:
