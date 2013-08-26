@@ -199,17 +199,20 @@ class VirtualMachine( CMSComponent ):
         "Update the configurations for this component."
         if not self._have_comp_config:
             return
-        f = open(self.get_config_file_name(), "w")
-        config = {}
-        config["IP"] = self.IP
-        config["MAC"] = self.MAC
-        config["start_script"] = self.start_script
-        config["stop_script"] = self.stop_script
-        config["config_hv_name"] = self.hv_name
-        config["_tenant_id"] = self._tenant_id
-        f.write(json.dumps(config))
-        f.flush()
-        f.close()
+        try:
+            with open(self.get_config_file_name(), "w") as f:
+                config = {}
+                config["IP"] = self.IP
+                config["MAC"] = self.MAC
+                config["start_script"] = self.start_script
+                config["stop_script"] = self.stop_script
+                config["config_hv_name"] = self.hv_name
+                config["_tenant_id"] = self._tenant_id
+                f.write(json.dumps(config))
+                f.flush()
+                f.close()
+        except IOError as e:
+            info("Fail to update config for VM %s\n" % self.name)
 
     def is_running( self ):
         "Test if this VM image is running (or inactive) on any hypervisor."
@@ -307,8 +310,18 @@ class Hypervisor( CMSComponent ):
 
     def update_comp_config( self ):
         "Update the configurations for this component."
-        # TODO: Implement me.
-        pass
+        if not self._have_comp_config:
+            return
+        try:
+            with open(self.get_config_file_name(), "w") as f:
+                config = {}
+                config["vm_dist_limit"] = self.vm_dist_limit
+                config["enabled"] = self._enabled
+                f.write(json.dumps(config))
+                f.flush()
+                f.close()
+        except IOError as e:
+            info("Fail to update config for HV %s\n" % self.name)
 
     def get_num_VMs( self ):
         "Return the number of VMs running on this hypervisor."
