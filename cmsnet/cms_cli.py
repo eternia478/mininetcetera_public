@@ -167,84 +167,85 @@ class CMSCLI( Cmd ):
     # CMS Main Commands (ZZZ)
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
-    def _check_vm_name( self, vm_name, exp_exist=True, exp_running=None ):
+    def _check_vm( self, name, exp_exist=True, exp_running=None ):
+        #check_vm( self, name, exp_exist=True, exp_run=None, exp_pause=None ):
         """
         Checks the correctness of the VM of the given name.
 
-        vm_name: Name of the VM image. If None, ignore and return.
+        name: Name of the VM image. If None, ignore and return.
         exp_exist: Expected result of existing or not.
         exp_running: Expected result of running or not. None if not matter.
         Returns True if error occured, False otherwise.
         """
-        if not vm_name:      # Ignore if not set by input.
-            return False     # NOTE: Already handled at parsing.
+        if not name:               # Ignore if not set by input.
+            return False, None     # NOTE: Already handled at parsing.
 
-        in_cn = vm_name in self.cn
-        comp = self.cn[vm_name] if in_cn else None
+        in_cn = name in self.cn
+        comp = self.cn[name] if in_cn else None
         is_VM = isinstance(comp, VirtualMachine)
         is_HV = isinstance(comp, Hypervisor)
         err = False
 
         if is_HV:
-            error('%s is a hypervisor\n' % vm_name)
+            error('%s is a hypervisor\n' % name)
             err = True
         elif in_cn and not any([is_VM, is_HV]):
-            error('%s is another type of component\n' % vm_name)
+            error('%s is another type of component\n' % name)
             err = True
         elif not is_VM and exp_exist:
-            error('No such VM image %s\n' % vm_name)
+            error('No such VM image %s\n' % name)
             err = True
         elif is_VM:
             if not exp_exist:
-                error('VM of the same name %s already exists\n' % vm_name)
+                error('VM of the same name %s already exists\n' % name)
                 err = True
             elif exp_running is not None:
                 vm_run = comp.is_running()
                 if not vm_run and exp_running:
-                    error('VM %s is currently inactive\n' % vm_name)
+                    error('VM %s is currently inactive\n' % name)
                     err = True
                 elif vm_run and not exp_running:
-                    error('VM %s is currently running\n' % vm_name)
+                    error('VM %s is currently running\n' % name)
                     err = True
 
-        return err
+        return err, comp
 
-    def _check_hv_name( self, hv_name, exp_enabled=True ):
+    def _check_hv( self, name, exp_enabled=True ):
         """
         Checks the correctness of the hypervisor of the given name.
 
-        hv_name: Name of the hypervisor. If None, ignore and return.
+        name: Name of the hypervisor. If None, ignore and return.
         exp_enabled: Expected result of HV enabled or not.
         Returns True if error occured, False otherwise.
         """
-        if not hv_name:      # Ignore if not set by input.
-            return False     # NOTE: Already handled at parsing.
+        if not name:               # Ignore if not set by input.
+            return False, None     # NOTE: Already handled at parsing.
 
-        in_cn = hv_name in self.cn
-        comp = self.cn[hv_name] if in_cn else None
+        in_cn = name in self.cn
+        comp = self.cn[name] if in_cn else None
         is_VM = isinstance(comp, VirtualMachine)
         is_HV = isinstance(comp, Hypervisor)
         err = False
 
         if is_VM:
-            error('%s is a VM image\n' % hv_name)
+            error('%s is a VM image\n' % name)
             err = True
         elif in_cn and not any([is_VM, is_HV]):
-            error('%s is another type of component\n' % hv_name)
+            error('%s is another type of component\n' % name)
             err = True
         elif not is_HV:
-            error('No such hypervisor %s\n' % hv_name)
+            error('No such hypervisor %s\n' % name)
             err = True
         elif is_HV:
             hv_enb = comp.is_enabled()
             if not hv_enb and exp_enabled:
-                error('Hypervisor %s is currently disabled\n' % hv_name)
+                error('Hypervisor %s is currently disabled\n' % name)
                 err = True
             elif hv_enb and not exp_enabled:
-                error('Hypervisor %s is currently enabled\n' % hv_name)
+                error('Hypervisor %s is currently enabled\n' % name)
                 err = True
 
-        return err
+        return err, comp
 
     def do_add( self, line, cmd_name='add' ):
         "Create a virtual machine image."
@@ -264,7 +265,7 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err = self._check_vm_name(vm_name, exp_exist=False)
+        err, comp = self._check_vm(vm_name, exp_exist=False)
         # TODO: Check vm_script value.
         
         if not err:
@@ -286,11 +287,12 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1 = self._check_vm_name(old_vm_name, exp_exist=True)
-        err2 = self._check_vm_name(new_vm_name, exp_exist=False)
+        err1, comp1 = self._check_vm(old_vm_name, exp_exist=True)
+        err2, comp2 = self._check_vm(new_vm_name, exp_exist=False)
 
         if not err1 and not err2:
-            self.cn.cloneVM(old_vm_name, new_vm_name)
+            old_vm = comp1
+            self.cn.cloneVM(old_vm, new_vm_name)
 
     def do_launch( self, line, cmd_name='launch' ):
         "Initialize the created VM on a hypervisor."
@@ -308,11 +310,13 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1 = self._check_vm_name(vm_name, exp_exist=True, exp_running=False)
-        err2 = self._check_hv_name(hv_name, exp_enabled=True)
+        err1, comp1 = self._check_vm(vm_name, exp_running=False)
+        err2, comp2 = self._check_hv(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
-            self.cn.launchVM(vm_name, hv_name)
+            vm = comp1
+            hv = comp2
+            self.cn.launchVM(vm, hv)
 
     def do_mv( self, line, cmd_name='mv' ):
         "Migrate a running image to another hypervisor."
@@ -328,11 +332,13 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1 = self._check_vm_name(vm_name, exp_exist=True, exp_running=True)
-        err2 = self._check_hv_name(hv_name, exp_enabled=True)
+        err1, comp1 = self._check_vm(vm_name, exp_running=True)
+        err2, comp2 = self._check_hv(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
-            self.cn.migrateVM(vm_name, hv_name)
+            vm = comp1
+            hv = comp2
+            self.cn.migrateVM(vm, hv)
 
     def do_stop( self, line, cmd_name='stop' ):
         "Stop a running image."
@@ -346,10 +352,11 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err = self._check_vm_name(vm_name, exp_exist=True, exp_running=True)
+        err, comp = self._check_vm(vm_name, exp_running=True)
         
         if not err:
-            self.cn.stopVM(vm_name)
+            vm = comp
+            self.cn.stopVM(vm)
 
     def do_rm( self, line, cmd_name='rm' ):
         "Remove the virtual machine image from the hypervisor."
@@ -363,10 +370,11 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err = self._check_vm_name(vm_name, exp_exist=True, exp_running=False)
+        err, comp = self._check_vm(vm_name, exp_exist=True)
         
         if not err:
-            self.cn.deleteVM(vm_name)
+            vm = comp
+            self.cn.deleteVM(vm)
 
     def do_mode( self, line, cmd_name='mode' ):
         "Change the mode of VM distribution across hypervisors."
@@ -440,10 +448,11 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err = self._check_hv_name(hv_name, exp_enabled=False)
+        err, comp = self._check_hv(hv_name, exp_enabled=False)
 
         if not err:
-            self.cn.enableHV(hv_name)
+            hv = comp
+            self.cn.enableHV(hv)
 
     def do_disable( self, line, cmd_name='disable' ):
         "Disable a hypervisor."
@@ -457,10 +466,11 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err = self._check_hv_name(hv_name, exp_enabled=True)
+        err, comp = self._check_hv(hv_name, exp_enabled=True)
 
         if not err:
-            self.cn.disableHV(hv_name)
+            hv = comp
+            self.cn.disableHV(hv)
 
     def do_qstart( self, line ):
         "Combination of add and launch."
@@ -478,8 +488,8 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1 = self._check_vm_name(vm_name, exp_exist=False)
-        err2 = self._check_hv_name(hv_name, exp_enabled=True)
+        err1, comp1 = self._check_vm(vm_name, exp_exist=False)
+        err2, comp2 = self._check_hv(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
             self.do_add(vm_name)

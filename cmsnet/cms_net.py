@@ -322,14 +322,16 @@ class CMSnet( object ):
         #     http://stackoverflow.com/questions/3207219/
         # Well, this works too.
         #     http://stackoverflow.com/questions/3964681/
+        vm_config_suffix = ".config_vm"
         err = False
         for file_name in os.listdir(self.config_folder):
-            if file_name.endswith(".config_vm"):
-                vm_name = file_name[:-10]
-                self.createVM(vm_name)
-                vm = self.nameToComp[ vm_name ]
+            if file_name.endswith(vm_config_suffix):
+                vm_name = file_name[:-len(vm_config_suffix)]
+                vm = self.createVM(vm_name)
                 if vm.config_hv_name:
-                    self.launchVM( vm_name, vm.config_hv_name )
+                    hv = self.nameToComp.get(vm.config_hv_name)
+                    if hv:
+                        self.launchVM( vm, hv )
                     if not vm.is_running():
                         err = True
         if err:
@@ -435,19 +437,19 @@ class CMSnet( object ):
     # CMS VM Distribution Mode Handling
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
-    def _getNextDefaultHVName( self ):
-        "Using the distribution mode, get the next default hv_name"
+    def _getNextDefaultHV( self ):
+        "Using the distribution mode, get the next default HV"
         if len(self.HVs) == 0:
             error_msg = "No hypervisor exists"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
+            error("\nCannot get HV: %s.\n" % error_msg)
             return
         vm_dist_handler = getattr(self, "_vm_dist_" + self.vm_dist_mode, None)
         if not vm_dist_handler:
             error_msg = "VM distribution mode %s invalid" % self.vm_dist_mode
-            error("\nCannot get hv_name: %s.\n" % error_msg)
+            error("\nCannot get HV: %s.\n" % error_msg)
             return
-        hv_name = vm_dist_handler()
-        return hv_name
+        hv = vm_dist_handler()
+        return hv
 
     @classmethod
     def getPossibleVMDistModes( cls ):
@@ -482,19 +484,19 @@ class CMSnet( object ):
                     hv_name = hv.name
         if hv_name is None:
             error_msg = "No hypervisor is available"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
+            error("\nCannot get HV: %s.\n" % error_msg)
             return
         return hv_name
 
     def _vm_dist_random( self ):
         "Choose a random HV."
         rand_hv = random.choice(self.HVs)
-        return rand_hv.name
+        return rand_hv
 
     def _vm_dist_sparse( self ):
         "Choose HVs sparsely and evenly."
         min_hv = min(self.HVs, key=lambda hv: len(hv.nameToVMs))
-        return min_hv.name
+        return min_hv
 
     def _vm_dist_packed( self ):
         "Choose HVs so that VMs are packed together."
@@ -502,50 +504,50 @@ class CMSnet( object ):
         avail_hvs = [hv for hv in self.HVs if not self.isHVFull(hv)]
         if len(avail_hvs) == 0:
             error_msg = "No hypervisor is available"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
+            error("\nCannot get HV: %s.\n" % error_msg)
             return
         max_hv = max(avail_hvs, key=lambda hv: len(hv.nameToVMs))
-        return max_hv.name
+        return max_hv
 
     def _vm_dist_same( self ):
         "Choose an HV the same as the last chosen one."
         if not self.last_HV:
             error_msg = "No hypervisor last chosen"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
+            error("\nCannot get HV: %s.\n" % error_msg)
             return
         same_hv = self.last_HV
-        return same_hv.name
+        return same_hv
 
     def _vm_dist_different( self ):
         "Choose a random HV different from the last chosen one."
         if not self.last_HV:
             error_msg = "No hypervisor last chosen"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
+            error("\nCannot get HV: %s.\n" % error_msg)
             return
         diff_hv = random.choice([hv for hv in self.HVs if hv != self.last_HV])
-        return diff_hv.name
+        return diff_hv
 
     def _vm_dist_next( self ):
         "Choose HVs in a cycle."
         if not self.last_HV:
             error_msg = "No hypervisor last chosen"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
+            error("\nCannot get HV: %s.\n" % error_msg)
             return
         last_hv_index = self.HVs.index(self.last_HV)
         next_hv_index = (last_hv_index + 1) % len(self.HVs)
         next_hv = self.HVs[next_hv_index]
-        return next_hv.name
+        return next_hv
 
     def _vm_dist_previous( self ):
         "Choose HVs in a cycle, rotating in reverse."
         if not self.last_HV:
             error_msg = "No hypervisor last chosen"
-            error("\nCannot get hv_name: %s.\n" % error_msg)
+            error("\nCannot get HV: %s.\n" % error_msg)
             return
         last_hv_index = self.HVs.index(self.last_HV)
         prev_hv_index = (last_hv_index - 1) % len(self.HVs)
         prev_hv = self.HVs[prev_hv_index]
-        return prev_hv.name
+        return prev_hv
 
 
 
@@ -585,19 +587,18 @@ class CMSnet( object ):
 
         return vm
 
-    def cloneVM( self, old_vm_name, new_vm_name=None ):
+    def cloneVM( self, old_vm, new_vm_name=None ):
         "Clone a virtual machine image."
         if self.debug_flag1:
-            print "EXEC: cloneVM(%s, %s):" % (old_vm_name, new_vm_name)
+            print "EXEC: cloneVM(%s, %s):" % (old_vm, new_vm_name)
 
         if new_vm_name is None:          
-            new_vm_name = old_vm_name
+            new_vm_name = old_vm.name
             while new_vm_name in self.nameToComp:
                 new_vm_name += ".cp"
 
-        assert old_vm_name in self.nameToComp
+        assert old_vm in self.VMs
         assert new_vm_name not in self.nameToComp
-        old_vm = self.nameToComp.get(old_vm_name)
         assert isinstance(old_vm, VirtualMachine)
 
         vm_cls = old_vm.__class__
@@ -615,20 +616,18 @@ class CMSnet( object ):
 
         return new_vm
 
-    def launchVM( self, vm_name, hv_name=None ):
+    def launchVM( self, vm, hv=None ):
         "Initialize the created VM on a hypervisor."
         if self.debug_flag1:
-            print "EXEC: launchVM(%s, %s):" % (vm_name, hv_name)
+            print "EXEC: launchVM(%s, %s):" % (vm, hv)
 
-        if hv_name == None:
-            hv_name = self._getNextDefaultHVName()
-            if hv_name == None:  # Some error occurred.
+        if hv is None:
+            hv = self._getNextDefaultHV()
+            if hv is None:       # Some error occurred.
                 return           # Return and do nothing.
 
-        assert vm_name in self.nameToComp
-        assert hv_name in self.nameToComp
-        vm = self.nameToComp.get(vm_name)
-        hv = self.nameToComp.get(hv_name)
+        assert vm in self.VMs
+        assert hv in self.HVs
         assert isinstance(vm, VirtualMachine)
         assert isinstance(hv, Hypervisor)
         assert not vm.is_running()
@@ -639,15 +638,13 @@ class CMSnet( object ):
         self.last_HV = hv
         self.send_msg_to_controller("instantiated", vm)
 
-    def migrateVM( self, vm_name, hv_name ):
+    def migrateVM( self, vm, hv ):
         "Migrate a running image to another hypervisor."
         if self.debug_flag1:
-            print "EXEC: migrateVM(%s, %s):" % (vm_name, hv_name)
+            print "EXEC: migrateVM(%s, %s):" % (vm, hv)
 
-        assert vm_name in self.nameToComp
-        assert hv_name in self.nameToComp
-        vm = self.nameToComp.get(vm_name)
-        hv = self.nameToComp.get(hv_name)
+        assert vm in self.VMs
+        assert hv in self.HVs
         assert isinstance(vm, VirtualMachine)
         assert isinstance(hv, Hypervisor) 
         assert vm.is_running()
@@ -657,13 +654,12 @@ class CMSnet( object ):
         vm.moveTo(hv)
         self.send_msg_to_controller("migrated", vm)
 
-    def stopVM( self, vm_name ):
+    def stopVM( self, vm ):
         "Stop a running image."
         if self.debug_flag1:
-            print "EXEC: stopVM(%s):" % vm_name
+            print "EXEC: stopVM(%s):" % vm
 
-        assert vm_name in self.nameToComp
-        vm = self.nameToComp.get(vm_name)
+        assert vm in self.VMs
         assert isinstance(vm, VirtualMachine)
         assert vm.is_running()
 
@@ -671,24 +667,22 @@ class CMSnet( object ):
         self._removeLink(vm.node)
         self.send_msg_to_controller("destroyed", vm)
 
-    def deleteVM( self, vm_name ):
+    def deleteVM( self, vm ):
         "Remove the virtual machine image from the hypervisor."
         if self.debug_flag1:
-            print "EXEC: deleteVM(%s):" % vm_name
+            print "EXEC: deleteVM(%s):" % vm
 
-        assert vm_name in self.nameToComp
-        vm = self.nameToComp.get(vm_name)
+        assert vm in self.VMs
         assert isinstance(vm, VirtualMachine)
         if vm.is_running():
-            self.stopVM(vm_name)
+            self.stopVM(vm)
 
         # self.not_implemented()
         
-        self.stopVM(vm_name)
-        vm = self.nameToComp[vm_name]
+        self.stopVM(vm)
         self.VMs.remove(vm)
-        del self.nameToComp[ vm_name ]
-        info( '*** Stopping host: %s\n' % vm_name ) 
+        del self.nameToComp[ vm.name ]
+        info( '*** Stopping host: %s\n' % vm.name ) 
         vm.node.terminate()
         # Remove the file
         os.remove(vm.get_config_file_name()) 
@@ -734,25 +728,23 @@ class CMSnet( object ):
         self.msg_level = msg_level
         self.update_net_config()
 
-    def enableHV( self, hv_name ):
+    def enableHV( self, hv ):
         "Enable a hypervisor."
         if self.debug_flag1:
-            print "EXEC: enableHV(%s):" % hv_name
+            print "EXEC: enableHV(%s):" % hv
 
-        assert hv_name in self.nameToComp
-        hv = self.nameToComp.get(hv_name)
+        assert hv in self.HVs
         assert isinstance(hv, Hypervisor) 
         assert not hv.is_enabled()
 
         hv.enable()
 
-    def disableHV( self, hv_name ):
+    def disableHV( self, hv ):
         "Disable a hypervisor."
         if self.debug_flag1:
-            print "EXEC: disableHV(%s):" % hv_name
+            print "EXEC: disableHV(%s):" % hv
 
-        assert hv_name in self.nameToComp
-        hv = self.nameToComp.get(hv_name)
+        assert hv in self.HVs
         assert isinstance(hv, Hypervisor) 
         assert hv.is_enabled()
 
