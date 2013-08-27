@@ -37,6 +37,7 @@ from mininet.util import quietRun, isShellBuiltin, dumpNodeConnections
 from mininet.util import checkInt
 
 from cmsnet.cms_comp import VirtualMachine, Hypervisor
+import re
 
 class CMSCLI( Cmd ):
     "Simple command-line interface to talk to VMs and hypervisors."
@@ -177,14 +178,21 @@ class CMSCLI( Cmd ):
         if not vm_name:     # Ignore NoneType names
             return False
 
-        if vm_name in self.cn:
-            comp = self.cn[vm_name]
-            if isinstance(comp, VirtualMachine):
-                error('VM of the same name %s already exists\n' % vm_name)
-            elif isinstance(comp, Hypervisor):
-                error('%s is a hypervisor\n' % vm_name)
+        if vm_name in self.cn.mn:
+            if vm_name in self.cn:
+                comp = self.cn[vm_name]
+                if isinstance(comp, VirtualMachine):
+                    error('VM of the same name %s already exists\n' % vm_name)
+                elif isinstance(comp, Hypervisor):
+                    error('%s is a hypervisor\n' % vm_name)
+                else:
+                    error('%s is another type of component\n' % vm_name)
             else:
-                error('%s is another type of component\n' % vm_name)
+                error('%s is another node in underlying network\n' % vm_name)
+            return True
+        r = r'^([scdf]|hv|switch|controller|dummy|fabric)(\d+)?$'
+        if re.search( r, vm_name ):
+            error('%s is a reserved name for another type\n' % vm_name)
             return True
 
         return False
