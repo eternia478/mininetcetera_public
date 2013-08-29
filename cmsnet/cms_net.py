@@ -154,10 +154,12 @@ class CMSnet( object ):
         self.VMs = []
         self.HVs = []
         self.nameToComp = {}   # name to CMSComponent (VM/HV) objects 
+
         self.last_HV = None
         self.controller_socket = None
         self.possible_modes = CMSnet.getPossibleVMDistModes()
         self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
+        self.possible_scripts = CMSnet.getPossibleVMScripts()
 
         if not self.new_config:
             self.check_net_config()
@@ -302,19 +304,12 @@ class CMSnet( object ):
     def get_hypervisors( self ):
         "Collect all hypervisors."
         # HV don't need loading. Just attach to switch.
-        if self.vm_dist_mode:
-            self.get_hypervisors_beta()
-            return
-        if self.mn.topo is not None:
-            assert hasattr(self.mn.topo, 'hvSwitches')
-            for hv_name in self.mn.topo.hvSwitches():
-                sw = self.mn.nameToNode[hv_name]
-                hv = self.hv_cls(sw, self.config_folder)
+        for node_name in self.mn.nameToNode:
+            node = self.mn.nameToNode[node_name]
+            if node.params.get("cms_type") == "hypervisor":
+                hv = self.hv_cls( node, self.config_folder)
                 self.HVs.append(hv)
-                self.nameToComp[ hv_name ] = hv
-        else:
-            print "Sorry, we don't support hacky approaches. Muahaha!"
-            print "Please leave a topo after the beep. BEEEEEEEP!"
+                self.nameToComp[ node_name ] = hv
 
     def get_old_VMs( self ):
         "Collect all previously saved VMs."
@@ -373,11 +368,30 @@ class CMSnet( object ):
             except Exception,e:
                 warn("\nCannot send to controller: %s\n" % str(e))
             
+    @classmethod
+    def getPossibleVMDistModes( cls ):
+        "Dynamically obtain all possible VM distribution mode names."
+        vm_dist_prefix = "_vm_dist_"
+        method_list = dir(cls)   #cls.__dict__
+        dist_mode_names = []
+        for method in method_list:
+            if method.startswith(vm_dist_prefix):
+                mode_name = method[len(vm_dist_prefix):]
+                dist_mode_names.append( mode_name )
+        return dist_mode_names
 
     @classmethod
     def getPossibleCMSMsgLevels( cls ):
         "Dynamically obtain all possible message levels for the controller."
         return ["all", "instantiated", "migrated", "destroyed", "none"]
+
+    @classmethod
+    def getPossibleVMScripts( cls ):
+        "Dynamically obtain all possible scripts for VMs to run."
+        pass
+
+
+
 
 
 
@@ -389,18 +403,6 @@ class CMSnet( object ):
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
     # CMS Testing Stuff
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
-
-    def get_hypervisors_beta( self ):
-        "Collect all hypervisors."
-        # TODO: Untested version. Please test this at some point.
-        # HV don't need loading. Just attach to switch.
-        # Default? In case added more nodes after topo...
-        for node_name in self.mn.nameToNode:
-            node = self.mn.nameToNode[node_name]
-            if node.params.get("cms_type") == "hypervisor":
-                hv = self.hv_cls( node, self.config_folder)
-                self.HVs.append(hv)
-                self.nameToComp[ node_name ] = hv
 
     def addHVSwitch( self, name, cls=None, **params ):
         """Add HV-switch. FOR TESTING PURPOSES ONLY.
@@ -450,21 +452,6 @@ class CMSnet( object ):
             return
         hv = vm_dist_handler()
         return hv
-
-    @classmethod
-    def getPossibleVMDistModes( cls ):
-        "Dynamically obtain all possible VM distribution mode names."
-        vm_dist_prefix = "_vm_dist_"
-        method_list = dir(cls)   #cls.__dict__  # dir(cls)
-        dist_mode_names = []
-        for method in method_list:
-            if method.startswith(vm_dist_prefix):
-                mode_name = method[len(vm_dist_prefix):]
-                dist_mode_names.append( mode_name )
-        #get_mode_name = lambda method: method[len(vm_dist_prefix):]
-        #is_dist_mode = lambda method: method.startswith(vm_dist_prefix)
-        #dist_mode_names =map(get_mode_name, filter(is_dist_mode, method_list))
-        return dist_mode_names
 
     def isHVFull( self, hv ):
         "Check if hypervisor has reached its VM capacity limit (packed mode)."
@@ -556,8 +543,12 @@ class CMSnet( object ):
 
 
 
+
+
+
+
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
-    # CMS Main Commands (ZZZ)
+    # CMS Main VM Commands (ZZZ)
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
     def not_implemented( self ):
@@ -704,6 +695,49 @@ class CMSnet( object ):
         # TODO: Remove file!
         """
 
+    def pauseVM( self, vm ):
+        "Pause a currently running VM."
+        if self.debug_flag1:
+            print "EXEC: pauseVM(%s):" % vm
+
+        assert vm in self.VMs
+        assert isinstance(vm, VirtualMachine)
+        assert vm.is_running()
+        #assert not vm.is_paused()
+
+        self.not_implemented()
+
+    def resumeVM( self, vm ):
+        "Resume a currently paused VM."
+        if self.debug_flag1:
+            print "EXEC: resumeVM(%s):" % vm
+
+        assert vm in self.VMs
+        assert isinstance(vm, VirtualMachine)
+        assert vm.is_running()
+        #assert vm.is_paused()
+
+        self.not_implemented()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS Main Toggle Commands
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
     def changeVMDistributionMode( self, vm_dist_mode, vm_dist_limit=None ):
         "Change the mode of VM distribution across hypervisors."
         if self.debug_flag1:
@@ -728,6 +762,47 @@ class CMSnet( object ):
         self.msg_level = msg_level
         self.update_net_config()
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS Main HV Commands
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
+    def evictVMsFromHV( self, hv ):
+        "Evict all VMs running on the hypervisor off to other VMs."
+        if self.debug_flag1:
+            print "EXEC: evictVMsFromHV(%s):" % hv
+
+        assert hv in self.HVs
+        assert isinstance(hv, Hypervisor)
+        assert hv.is_enabled()
+
+        self.not_implemented()
+
+    def invictVMsToHV( self, hv, num_vms=1 ):
+        "Invict a number of inactive VMs to run on the hypervisor."
+        if self.debug_flag1:
+            print "EXEC: invictVMsToHV(%s):" % (hv, num_vms)
+
+        assert hv in self.HVs
+        assert isinstance(hv, Hypervisor)
+        assert hv.is_enabled()
+        assert num_vms > 0
+
+        self.not_implemented()
+
     def enableHV( self, hv ):
         "Enable a hypervisor."
         if self.debug_flag1:
@@ -738,6 +813,7 @@ class CMSnet( object ):
         assert not hv.is_enabled()
 
         hv.enable()
+        self.not_implemented()
 
     def disableHV( self, hv ):
         "Disable a hypervisor."
@@ -749,6 +825,42 @@ class CMSnet( object ):
         assert hv.is_enabled()
 
         hv.disable()
+        self.not_implemented()
+
+    def killHV( self, hv ):
+        "Kill a hypervisor."
+        if self.debug_flag1:
+            print "EXEC: killHV(%s):" % hv
+
+        assert hv in self.HVs
+        assert isinstance(hv, Hypervisor) 
+        assert hv.is_enabled()
+
+        self.not_implemented()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

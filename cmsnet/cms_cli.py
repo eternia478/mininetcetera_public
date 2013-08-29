@@ -468,6 +468,13 @@ class CMSCLI( Cmd ):
         if not err:
             self.cn.deleteVM(vm)
 
+    def do_pause( self, line, cmd_name='pause' ):
+        "Pause a currently running VM."
+        pass
+
+    def do_resume( self, line, cmd_name='resume' ):
+        "Resume a currently paused VM."
+        pass
 
 
 
@@ -606,9 +613,11 @@ class CMSCLI( Cmd ):
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
     def do_evict( self, line, cmd_name='evict' ):
+        "Evict all VMs running on the hypervisor off to other VMs."
         pass
 
     def do_invict( self, line, cmd_name='invict' ):
+        "Invict a number of inactive VMs to run on the hypervisor."
         pass
 
     def do_enable( self, line, cmd_name='enable' ):
@@ -649,11 +658,6 @@ class CMSCLI( Cmd ):
         "Kill a hypervisor."
         pass
 
-    def do_pause( self, line, cmd_name='pause' ):
-        pass
-
-    def do_resume( self, line, cmd_name='resume' ):
-        pass
 
 
 
