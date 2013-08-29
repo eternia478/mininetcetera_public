@@ -337,25 +337,36 @@ class CMSCLI( Cmd ):
         "Create a virtual machine image."
         args = line.split()
         vm_name = None
-        vm_script = None      # TODO: Still working on extra options.
-        vm_ip = None          # Current there is no point in these variables.
-        vm_extra_params = {}
+        vm_kwargs = {}
 
         if len(args) == 1:
-            vm_name = args[0]
-        elif len(args) == 2:
-            vm_name = args[0]
-            vm_script = args[1]
+            vm_name, vm_args, vm_kwargs = splitArgs(args[0])
+            if len(vm_args) >= 1:
+                if vm_kwargs.get("vm_script"):
+                    error("Bad argument: multiple values for vm_script\n")
+                    return
+                else:
+                    vm_kwargs["vm_script"] = vm_args[0]
+            if len(vm_args) >= 2:
+                if vm_kwargs.get("vm_cls"):
+                    error("Bad argument: multiple values for vm_cls\n")
+                    return
+                else:
+                    vm_kwargs["vm_cls"] = vm_args[1]
+            if len(vm_args) >= 3:
+                error("Bad argument: have more than 3 non-keyword arguments\n")
+                return
         else:
-            usage = '%s vm_name [vm_script]' % cmd_name
+            item = 'vm_name[,vm_script][,vm_cls][,vm_kwarg=kwarg]'
+            usage = '%s %s' % (cmd_name, item)
             error('invalid number of args: %s\n' % usage)
             return
 
-        err = self._check_vm_name_available(vm_name)
-        # TODO: Check vm_script value.
-
-        if not err:
-            self.cn.createVM(vm_name, vm_script)
+        err1 = self._check_vm_name_available(vm_name)
+        err2 = False      # TODO: Check vm_script value and others.
+ 
+        if not err1 and not err2:
+            self.cn.createVM(vm_name, **vm_kwargs)
 
     def do_cp( self, line, cmd_name='cp' ):
         "Clone a virtual machine image."
