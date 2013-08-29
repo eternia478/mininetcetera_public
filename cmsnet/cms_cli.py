@@ -294,14 +294,9 @@ class CMSCLI( Cmd ):
 
         return False
 
-    def _check_vm( self, name, exp_exist=True, exp_running=None ):
+    def _check_vm( self, name, exp_running=None ):
         if not name:               # Ignore if not set by input.
             return False, None     # NOTE: Already handled at parsing.
-
-        if not exp_exist:
-            err = self._check_vm_name_available(name)
-            vm = None
-            return err, vm
 
         if name not in self.cn:
             error('No such VM image %s\n' % name)
@@ -311,7 +306,7 @@ class CMSCLI( Cmd ):
         return err, vm
 
 
-    def _check_hv( self, name, exp_enabled=True ):
+    def _check_hv( self, name, exp_enabled=None ):
         if not name:               # Ignore if not set by input.
             return False, None     # NOTE: Already handled at parsing.
 
@@ -334,7 +329,7 @@ class CMSCLI( Cmd ):
 
 
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
-    # CMS Main Commands (ZZZ)
+    # CMS Main VM Commands (ZZZ)
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
 
@@ -356,10 +351,9 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, comp = self._check_vm(vm_name, exp_exist=False)
-        #err = self._check_vm_name_available(vm_name)
+        err = self._check_vm_name_available(vm_name)
         # TODO: Check vm_script value.
-        
+
         if not err:
             self.cn.createVM(vm_name, vm_script)
 
@@ -379,11 +373,10 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1, comp1 = self._check_vm(old_vm_name, exp_exist=True)
-        err2, comp2 = self._check_vm(new_vm_name, exp_exist=False)
+        err1, old_vm = self._check_vm(old_vm_name)
+        err2 = self._check_vm_name_available(vm_name)
 
         if not err1 and not err2:
-            old_vm = comp1
             self.cn.cloneVM(old_vm, new_vm_name)
 
     def do_launch( self, line, cmd_name='launch' ):
@@ -402,12 +395,10 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1, comp1 = self._check_vm(vm_name, exp_running=False)
-        err2, comp2 = self._check_hv(hv_name, exp_enabled=True)
+        err1, vm = self._check_vm(vm_name, exp_running=False)
+        err2, hv = self._check_hv(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
-            vm = comp1
-            hv = comp2
             self.cn.launchVM(vm, hv)
 
     def do_mv( self, line, cmd_name='mv' ):
@@ -416,20 +407,20 @@ class CMSCLI( Cmd ):
         vm_name = None
         hv_name = None
 
-        if len(args) == 2:
+        if len(args) == 1:
+            vm_name = args[0]
+        elif len(args) == 2:
             vm_name = args[0]
             hv_name = args[1]
         else:
-            usage = '%s vm_name hv_name' % cmd_name
+            usage = '%s vm_name [hv_name]' % cmd_name
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1, comp1 = self._check_vm(vm_name, exp_running=True)
-        err2, comp2 = self._check_hv(hv_name, exp_enabled=True)
+        err1, vm = self._check_vm(vm_name, exp_running=True)
+        err2, hv = self._check_hv(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
-            vm = comp1
-            hv = comp2
             self.cn.migrateVM(vm, hv)
 
     def do_stop( self, line, cmd_name='stop' ):
@@ -444,14 +435,13 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, comp = self._check_vm(vm_name, exp_running=True)
-        
+        err, vm = self._check_vm(vm_name, exp_running=True)
+
         if not err:
-            vm = comp
             self.cn.stopVM(vm)
 
     def do_rm( self, line, cmd_name='rm' ):
-        "Remove the virtual machine image from the hypervisor."
+        "Remove the virtual machine image from CMSnet."
         args = line.split()
         vm_name = None
 
@@ -462,11 +452,33 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, comp = self._check_vm(vm_name, exp_exist=True)
+        err, vm = self._check_vm(vm_name)
         
         if not err:
-            vm = comp
             self.cn.deleteVM(vm)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS Main Toggle Commands
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
 
     def do_mode( self, line, cmd_name='mode' ):
         "Change the mode of VM distribution across hypervisors."
@@ -528,6 +540,31 @@ class CMSCLI( Cmd ):
 
         self.cn.changeCMSMsgLevel(msg_level)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS Main HV Commands
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
+    def do_evict( self, line, cmd_name='evict' ):
+        pass
+
+    def do_invict( self, line, cmd_name='invict' ):
+        pass
+
     def do_enable( self, line, cmd_name='enable' ):
         "Enable a hypervisor."
         args = line.split()
@@ -540,10 +577,9 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, comp = self._check_hv(hv_name, exp_enabled=False)
+        err, hv = self._check_hv(hv_name, exp_enabled=False)
 
         if not err:
-            hv = comp
             self.cn.enableHV(hv)
 
     def do_disable( self, line, cmd_name='disable' ):
@@ -558,11 +594,44 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, comp = self._check_hv(hv_name, exp_enabled=True)
+        err, hv = self._check_hv(hv_name, exp_enabled=True)
 
         if not err:
-            hv = comp
             self.cn.disableHV(hv)
+
+    def do_kill( self, line, cmd_name='kill' ):
+        "Kill a hypervisor."
+        pass
+
+    def do_pause( self, line, cmd_name='pause' ):
+        pass
+
+    def do_resume( self, line, cmd_name='resume' ):
+        pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS Beta Commands
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
+
+
 
     def do_qstart( self, line ):
         "Combination of add and launch."
@@ -580,12 +649,22 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1, comp1 = self._check_vm(vm_name, exp_exist=False)
-        err2, comp2 = self._check_hv(hv_name, exp_enabled=True)
+        err1 = self._check_vm_name_available(vm_name)
+        err2, hv = self._check_hv(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
             self.do_add(vm_name)
             self.do_launch(line)
+
+
+
+
+
+
+
+
+
+
 
 
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
@@ -610,13 +689,21 @@ class CMSCLI( Cmd ):
     def do_move( self, line ):
         self.do_mv(line, cmd_name='move')
 
-    def do_destroy( self, line ):
-        self.do_stop(line, cmd_name='destroy')
+    #def do_destroy( self, line ):
+    #    self.do_stop(line, cmd_name='destroy')
+
+    def do_remove( self, line ):
+        self.do_rm(line, cmd_name='remove')
 
     def do_delete( self, line ):
         self.do_rm(line, cmd_name='delete')
 
-    
+    def do_crash( self, line ):
+        self.do_kill(line, cmd_name='crash')
+
+    def do_unpause( self, line ):
+        self.do_resume(line, cmd_name='unpause')
+
 
 
 
