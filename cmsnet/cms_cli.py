@@ -294,7 +294,7 @@ class CMSCLI( Cmd ):
 
         return False
 
-    def _check_vm( self, name, exp_running=None ):
+    def _check_vm( self, name, exp_running=None, exp_paused=None ):
         if not name:               # Ignore if not set by input.
             return False, None     # NOTE: Already handled at parsing.
 
@@ -302,7 +302,7 @@ class CMSCLI( Cmd ):
             error('No such VM image %s\n' % name)
             return True, None
         vm = self.cn[name]
-        err = self._check_vm_status(vm, exp_running=exp_running)
+        err = self._check_vm_status(vm, exp_running=exp_running) #FIXME
         return err, vm
 
 
@@ -470,11 +470,37 @@ class CMSCLI( Cmd ):
 
     def do_pause( self, line, cmd_name='pause' ):
         "Pause a currently running VM."
-        pass
+        args = line.split()
+        vm_name = None
+
+        if len(args) == 1:
+            vm_name = args[0]
+        else:
+            usage = '%s vm_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, vm = self._check_vm(vm_name, exp_running=True, exp_paused=False)
+        
+        if not err:
+            self.cn.pauseVM(vm)
 
     def do_resume( self, line, cmd_name='resume' ):
         "Resume a currently paused VM."
-        pass
+        args = line.split()
+        vm_name = None
+
+        if len(args) == 1:
+            vm_name = args[0]
+        else:
+            usage = '%s vm_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, vm = self._check_vm(vm_name, exp_running=True, exp_paused=True)
+        
+        if not err:
+            self.cn.resumeVM(vm)
 
 
 
@@ -527,6 +553,14 @@ class CMSCLI( Cmd ):
         vm_dist_args = None
 
         if len(args) == 0:
+            usage1 = '\t%s random|sparse' % cmd_name
+            usage2 = '\t%s packed [vm_dist_limit]' % cmd_name
+            usage3 = '\t%s same|different [last_vm]' % cmd_name
+            usage4 = '\t%s cycle [cycle_pos [hv_name1 hv_name2...]]' % cmd_name
+            usage5 = '\t%s cycleall [cycle_pos]' % cmd_name
+            output("usage:\n")
+            output("\n".join([usage1, usage2, usage3, usage4, usage5]))
+            output("\n")
             self.do_modeinfo(line, cmd_name='mode')
             return
 
@@ -642,11 +676,47 @@ class CMSCLI( Cmd ):
 
     def do_evict( self, line, cmd_name='evict' ):
         "Evict all VMs running on the hypervisor off to other VMs."
-        pass
+        args = line.split()
+        hv_name = None
+
+        if len(args) == 1:
+            hv_name = args[0]
+        else:
+            usage = '%s hv_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, hv = self._check_hv(hv_name, exp_enabled=True)
+
+        if not err:
+            self.cn.evictVMsFromHV(hv)
 
     def do_invict( self, line, cmd_name='invict' ):
         "Invict a number of inactive VMs to run on the hypervisor."
-        pass
+        args = line.split()
+        hv_name = None
+        max_num_vms = 1
+
+        if len(args) == 1:
+            hv_name = args[0]
+        elif len(args) == 2:
+            hv_name = args[0]
+            if not checkInt(args[1]):
+                error('second argument not an integer: %s\n' % args[1])
+                return
+            max_num_vms = int(args[1])
+            if max_num_vms <= 0:
+                error('max_num_vms not positive: %s\n' % max_num_vms)
+                return
+        else:
+            usage = '%s hv_name [max_num_vms]' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, hv = self._check_hv(hv_name, exp_enabled=True)
+
+        if not err:
+            self.cn.invictVMsToHV(hv, max_num_vms)
 
     def do_enable( self, line, cmd_name='enable' ):
         "Enable a hypervisor."
@@ -684,7 +754,20 @@ class CMSCLI( Cmd ):
 
     def do_kill( self, line, cmd_name='kill' ):
         "Kill a hypervisor."
-        pass
+        args = line.split()
+        hv_name = None
+
+        if len(args) == 1:
+            hv_name = args[0]
+        else:
+            usage = '%s hv_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, hv = self._check_hv(hv_name, exp_enabled=True)
+
+        if not err:
+            self.cn.killHV(hv)
 
 
 
