@@ -510,10 +510,13 @@ class CMSCLI( Cmd ):
         out_str = "vm_dist_mode: %s" % self.cn.vm_dist_mode
         if self.cn.vm_dist_mode == "packed":
             out_str += "\tvm_dist_limit: %s" % self.cn.vm_dist_limit
-        elif self.cn.vm_dist_mode in ["same", "different", "next", "prev"]:
+        elif self.cn.vm_dist_mode in ["same", "different"]:
             out_str += "\tlast_hv: %s" % self.cn.last_hv
-        elif self.cn.vm_dist_mode == "cycle":
-            out_str += "\thv_cycle: %s" % self.cn.hv_cycle
+        elif self.cn.vm_dist_mode in ["cycle", "cycleall"]:
+            out_str += "\tcycle_pos: %s" % self.cn.cycle_pos
+            if self.cn.vm_dist_mode == "cycle":
+                hv_cycle_names = [hv.name for hv in self.cn.hv_cycle]
+                out_str += "\thv_cycle: %s" % hv_cycle_names
         
         output(out_str+"\n")
 
@@ -521,7 +524,7 @@ class CMSCLI( Cmd ):
         "Change the mode of VM distribution across hypervisors."
         args = line.split()
         vm_dist_mode = None
-        vm_dist_args = {}
+        vm_dist_args = None
 
         if len(args) == 0:
             self.do_modeinfo(line, cmd_name='mode')
@@ -533,6 +536,7 @@ class CMSCLI( Cmd ):
             return
 
         if len(args) >= 2:
+            vm_dist_args = {}
             if vm_dist_mode == "packed":
                 if len(args) > 2:
                     usage = '%s %s [vm_dist_limit]' % (cmd_name, vm_dist_mode)
@@ -546,7 +550,7 @@ class CMSCLI( Cmd ):
                     error('Invalid capacity limit: %s\n' % vm_dist_limit)
                     return
                 vm_dist_args["vm_dist_limit"] = vm_dist_limit
-            elif vm_dist_mode in ["same", "different", "next", "prev"]:
+            elif vm_dist_mode in ["same", "different"]:
                 if len(args) > 2:
                     usage = '%s %s [last_hv]' % (cmd_name, vm_dist_mode)
                     error('invalid number of args: %s\n' % usage)
@@ -555,21 +559,45 @@ class CMSCLI( Cmd ):
                 err, last_hv = self._check_hv(last_hv_name)
                 if err: return
                 vm_dist_args["last_hv"] = last_hv
-            elif vm_dist_mode == "cycle":
-                any_err = False
-                hv_cycle = []
-                for hv_name in args[1:]:
-                    err, hv = self._check_hv(hv_name)
-                    hv_cycle.append(hv)
-                    any_err = any_err or err
-                if any_err: return
+            elif vm_dist_mode in ["cycle", "cycleall"]:
+                if not checkInt(args[1]):
+                    error('second argument not an integer: %s\n' % args[1])
+                    return
+                hv_cycle = None
+                cycle_pos = int(args[1])
+
+                if len(args) > 2:
+                    if vm_dist_mode == "cycleall":
+                        usage = '%s %s [cycle_pos]' % (cmd_name, vm_dist_mode)
+                        error('invalid number of args: %s\n' % usage)
+                        return
+                    any_err = False
+                    hv_cycle = []
+                    for hv_name in args[2:]:
+                        err, hv = self._check_hv(hv_name)
+                        hv_cycle.append(hv)
+                        any_err = any_err or err
+                    if any_err: return
+
+                if hv_cycle:
+                    pos_range = range(0, len(hv_cycle))
+                elif vm_dist_mode == "cycle":
+                    pos_range = range(0, len(self.cn.hv_cycle))
+                else:
+                    pos_range = range(0, len(self.cn.HVs))
+                if cycle_pos not in pos_range:
+                    range_str = "range(0, %d)" % len(pos_range)
+                    error('cycle_pos %s not in %s\n' % (cycle_pos, range_str))
+                    return
+
                 vm_dist_args["hv_cycle"] = hv_cycle
+                vm_dist_args["cycle_pos"] = cycle_pos
             else:
                 usage = '%s %s' % (cmd_name, vm_dist_mode)
                 error('invalid number of args: %s\n' % usage)
                 return
 
-        self.cn.changeVMDistributionMode(vm_dist_mode, **vm_dist_args)
+        self.cn.changeVMDistributionMode(vm_dist_mode, vm_dist_args)
 
     def do_level( self, line, cmd_name='level' ):
         "Change the level of CMS message handling at the controller."

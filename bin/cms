@@ -197,7 +197,7 @@ class MininetRunner( object ):
         opts.add_option( '--config_folder', type='string', default='.',
                          help='folder that contains configuration files' )
         opts.add_option( '--vm_dist_mode', type='choice',
-                         choices=VM_DIST_MODES, default=VM_DIST_MODES[ 0 ],
+                         choices=VM_DIST_MODES, default="random",
                          help='|'.join( VM_DIST_MODES ) )
         opts.add_option( '--vm_dist_limit', type='int', default=10,
                           help='packed mode capacity limit' )
