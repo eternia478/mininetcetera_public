@@ -34,7 +34,7 @@ import time
 from mininet.log import info, output, error
 from mininet.term import makeTerms, runX11
 from mininet.util import quietRun, isShellBuiltin, dumpNodeConnections
-from mininet.util import checkInt
+from mininet.util import checkInt, splitArgs
 
 from cmsnet.cms_comp import VirtualMachine, Hypervisor
 import re
@@ -655,6 +655,99 @@ class CMSCLI( Cmd ):
         if not err1 and not err2:
             self.do_add(vm_name)
             self.do_launch(line)
+
+    def do_madd( self, line, cmd_name='madd' ):
+        "Create multiple virtual machine images."
+        args = line.split()
+
+        if not args:
+            item1 = 'vm_name1[,vm_script][,vm_cls][,vm_kwarg=kwarg]'
+            item2 = 'vm_name2'
+            defitem = '[vm_kwarg=default_kwarg]'
+            usage = '%s %s %s... %s' % (cmd_name, item1, item2, defitem)
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        default_kwargs = {}
+        last_arg = args[-1]
+        if "=" in last_arg.split(",",1)[0]:
+            default_arg = "filler," + last_arg
+            filler, filler_args, default_kwargs = splitArgs(default_arg)
+            args = args[:-1]
+
+        vm_info = {}
+        for arg in args:
+            vm_name, vm_args, vm_kwargs_temp = splitArgs(arg)
+            vm_kwargs = default_kwargs.copy()
+            vm_kwargs.update(vm_kwargs_temp)
+            if len(vm_args) >= 1:
+                if vm_kwargs.get("vm_script"):
+                    error("Bad argument: multiple values for vm_script\n")
+                    return
+                else:
+                    vm_kwargs["vm_script"] = vm_args[0]
+            if len(vm_args) >= 2:
+                if vm_kwargs.get("vm_cls"):
+                    error("Bad argument: multiple values for vm_cls\n")
+                    return
+                else:
+                    vm_kwargs["vm_cls"] = vm_args[1]
+            if len(vm_args) >= 3:
+                error("Bad argument: have more than 3 non-keyword arguments\n")
+                return
+            vm_info[vm_name] = vm_kwargs
+
+        for vm_name in vm_info:
+            vm_kwargs = vm_info[vm_name]
+            err1 = self._check_vm_name_available(vm_name)
+            err2 = False      # TODO: Check vm_script value and others.
+            if not err1 and not err2:
+                self.cn.createVM(vm_name, **vm_kwargs)
+
+    def do_mlaunch( self, line, cmd_name='mlaunch' ):
+        "Initialize multiple created VMs on hypervisors."
+        args = line.split()
+
+        if not args:
+            usage = '%s vm_name1 vm_name2...' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        for arg in args:
+            vm_name = arg
+            err, vm = self._check_vm(vm_name, exp_running=False)
+            if not err:
+                self.cn.launchVM(vm)
+
+    def do_mstop( self, line, cmd_name='mstop' ):
+        "Stop multiple running images."
+        args = line.split()
+
+        if not args:
+            usage = '%s vm_name1 vm_name2...' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        for arg in args:
+            vm_name = arg
+            err, vm = self._check_vm(vm_name, exp_running=True)
+            if not err:
+                self.cn.stopVM(vm)
+
+    def do_mrm( self, line, cmd_name='mrm' ):
+        "Remove multiple virtual machine images from CMSnet."
+        args = line.split()
+
+        if not args:
+            usage = '%s vm_name1 vm_name2...' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        for arg in args:
+            vm_name = arg
+            err, vm = self._check_vm(vm_name)
+            if not err:
+                self.cn.deleteVM(vm)
 
 
 
