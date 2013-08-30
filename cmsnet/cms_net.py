@@ -154,19 +154,27 @@ class CMSnet( object ):
         self.VMs = []
         self.HVs = []
         self.nameToComp = {}   # name to CMSComponent (VM/HV) objects 
+        self.controller_socket = None
 
         self.last_hv = None
         self.hv_cycle = []
         self.cycle_pos = -1
-        self.controller_socket = None
+
         self.possible_modes = CMSnet.getPossibleVMDistModes()
         self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
         self.possible_scripts = CMSnet.getPossibleVMScripts()
 
+        # Config placeholders. To make the python interp happy.
+        self._last_hv_name = None
+        self._hv_cycle_names = None
+        self._cycle_pos_temp = None
+
+        self._have_old_config_params = False
         if not self.new_config:
             self.check_net_config()
         self.mn = self.net_cls(**params)
-        self.update_net_config()
+        if not self._have_old_config_params:
+            self.update_net_config()
 
     # BL: We now have four ways to look up components
     # This may (should?) be cleaned up in the future.
@@ -222,7 +230,12 @@ class CMSnet( object ):
         self._tempStartDummy()
         self.mn.start()
         self.get_hypervisors()
-        self.get_old_VMs()
+        if not self.new_config:
+            err1 = self.get_old_mode_params()
+            err2 = self.get_old_VMs()
+            if err1 or err2:
+                self.stop()
+                raise Exception("Stopping CMSnet. Please manually fix config.")
         self.setup_controller_connection()
 
     def stop( self ):
@@ -244,64 +257,98 @@ class CMSnet( object ):
 
     def check_net_config( self ):
         "Check for any previous CMSnet configurations and adjust if necessary."
+        config_raw = None
+        # See http://stackoverflow.com/questions/3642080/
+        # Or alternatively see http://blog.bitfoc.us/?p=328
         try:
             with open(self.config_folder+"/cn.config_cmsnet", "r") as f:
                 config_raw = f.read()
-                config = {}
-                if config_raw:
-                    config, l = defaultDecoder.raw_decode(config_raw)
-                for attr in config:
-                    if attr.startswith("topo"):       # Handle separately.
-                        pass
-                    elif attr == "net_cls":
-                        cls = getattr(mininet.net, config[attr])
-                        setattr(self, attr, cls)
-                    elif attr.endswith("cls"):
-                        cls = getattr(cmsnet.cms_comp, config[attr])
-                        setattr(self, attr, cls)
-                    elif isinstance(config[attr], basestring):
-                        setattr(self, attr, str(config[attr]))
-                    else:
-                        setattr(self, attr, config[attr])
-                topo_cls_name = config.get("topo_cls")
-                if topo_cls_name:
-                    topo_cls = getattr(cmsnet.cms_topo, topo_cls_name)
-                    topo_opts = config.get("topo_opts", {})
-                    topo = topo_cls(**topo_opts)
-                    self.params.update({'topo': topo})
-                else:
-                    warn("\nNo topology exists for CMSnet\n")
-                f.close()                
         except IOError as e:
-            info("\nNo config exists for CMSnet\n")
+            info("\nNo previous config exists for CMSnet\n")
+            return
+        self._have_old_config_params = True
+
+        try:
+            config = {}
+            if config_raw:
+                config, l = defaultDecoder.raw_decode(config_raw)
+                assert isinstance(config, dict), "Config not a dictionary."
+            for attr in config:
+                if attr.startswith("topo"):     # Handle separately.
+                    pass
+                elif attr.endswith("cls_name"):
+                    pass
+                elif isinstance(config[attr], basestring):
+                    setattr(self, attr, str(config[attr]))
+                else:
+                    setattr(self, attr, config[attr])
+
+            net_cls_name = config.get("net_cls_name")
+            vm_cls_name = config.get("vm_cls_name")
+            hv_cls_name = config.get("hv_cls_name")
+            topo_cls_name = config.get("topo_cls_name")
+
+            if net_cls_name:
+                self.net_cls = getattr(mininet.net, net_cls_name)
+            if vm_cls_name:
+                self.vm_cls = getattr(cmsnet.cms_comp, vm_cls_name)
+            if hv_cls_name:
+                self.hv_cls = getattr(cmsnet.cms_comp, hv_cls_name)
+            if topo_cls_name:
+                topo_cls = getattr(cmsnet.cms_topo, topo_cls_name)
+                topo_opts = config.get("topo_opts", {})
+                topo = topo_cls(**topo_opts)
+                self.params.update({'topo': topo})
+            else:
+                warn("\nNo topology exists for CMSnet\n")
+        except Exception as e:
+            warn("\nConfig for CMSnet cannot be parsed.\n\t%s\n" % e)
+            return
 
     def update_net_config( self ):
         "Update the CMSnet configurations file."
-        f = open(self.config_folder+"/cn.config_cmsnet", "w")
-        config = {}
-        config["vm_dist_mode"] = self.vm_dist_mode
-        config["vm_dist_limit"] = self.vm_dist_limit
-        config["msg_level"] = self.msg_level
-        config["net_cls"] = self.net_cls.__name__
-        config["vm_cls"] = self.vm_cls.__name__
-        config["hv_cls"] = self.hv_cls.__name__
-        config["controller_ip"] = self.controller_ip
-        config["controller_port"] = self.controller_port
+        try:
+            config = {}
+            config["vm_dist_mode"] = self.vm_dist_mode
+            config["vm_dist_limit"] = self.vm_dist_limit
+            config["msg_level"] = self.msg_level
+            config["net_cls_name"] = self.net_cls.__name__
+            config["vm_cls_name"] = self.vm_cls.__name__
+            config["hv_cls_name"] = self.hv_cls.__name__
+            config["controller_ip"] = self.controller_ip
+            config["controller_port"] = self.controller_port
+            if self.last_hv:
+                config["_last_hv_name"] = self.last_hv.name
+            if self.hv_cycle:
+                config["_hv_cycle_names"] = [hv.name for hv in self.hv_cycle]
+            if self.cycle_pos >= 0:
+                config["_cycle_pos_temp"] = self.cycle_pos
 
-        topo = self.mn.topo
-        if topo:
-            topo_opts = {}
-            topo_opts["hv_num"] = topo.hv_num
-            topo_opts["fb_num"] = topo.fb_num
-            topo_opts["hopts"] = topo.hopts
-            topo_opts["sopts"] = topo.sopts
-            topo_opts["lopts"] = topo.lopts
-            config["topo_cls"] = topo.__class__.__name__
-            config["topo_opts"] = topo_opts
+            topo = self.mn.topo
+            if topo:
+                topo_opts = {}
+                topo_opts["hv_num"] = topo.hv_num
+                topo_opts["fb_num"] = topo.fb_num
+                topo_opts["hopts"] = topo.hopts
+                topo_opts["sopts"] = topo.sopts
+                topo_opts["lopts"] = topo.lopts
+                config["topo_cls_name"] = topo.__class__.__name__
+                config["topo_opts"] = topo_opts
 
-        f.write(json.dumps(config))
-        f.flush()
-        f.close()
+            config_raw = json.dumps(config)
+        except Exception as e:
+            warn("\nConfig for CMSnet cannot be created.\n\t%s\n" % e)
+            return
+
+        # See http://stackoverflow.com/questions/3642080/
+        # Or alternatively see http://blog.bitfoc.us/?p=328
+        try:
+            with open(self.config_folder+"/cn.config_cmsnet", "w") as f:
+                f.write(config_raw)
+                f.flush()
+        except IOError as e:
+            error("\nUnable to write to config file for CMSnet\n")
+            return
 
     def get_hypervisors( self ):
         "Collect all hypervisors."
@@ -313,6 +360,39 @@ class CMSnet( object ):
                 self.HVs.append(hv)
                 self.nameToComp[ node_name ] = hv
 
+    def get_old_mode_params( self ):
+        "Extract old configuration parameters for VM distribution modes."
+        err = False
+        if self._last_hv_name is not None:
+            self.last_hv = self.nameToComp.get(self._last_hv_name)
+            if not self.last_hv:
+                error("Last HV %s does not exist.\n" % self._last_hv_name)
+                err = True
+        if self._hv_cycle_names is not None:
+            self.hv_cycle = []
+            for hv_name in self._hv_cycle_names:
+                hv = self.nameToComp.get(hv_name)
+                if not hv:
+                    error("Cycle HV %s does not exist.\n" % hv_name)
+                    err = True
+                else:
+                    self.hv_cycle.append(hv)
+        if self._cycle_pos_temp is not None:
+            self.cycle_pos = self._cycle_pos_temp
+            if self.vm_dist_mode == "cycle":
+                pos_range = range(0, len(self._hv_cycle_names))
+            elif self.vm_dist_mode == "cycleall":
+                pos_range = range(0, len(self.cn.HVs))
+            else:
+                pos_range = range(0, self.cycle_pos+1)
+            if pos_range and self.cycle_pos not in pos_range:
+                range_str = "range(0, %d)" % len(pos_range)
+                error('cycle_pos %s not in %s\n' % (self.cycle_pos, range_str))
+                err = True
+        if err:
+            error("\nError occurred when getting vm_dist_mode parameters!\n")
+        return err
+
     def get_old_VMs( self ):
         "Collect all previously saved VMs."
         # I want to use glob here instead...
@@ -321,18 +401,31 @@ class CMSnet( object ):
         #     http://stackoverflow.com/questions/3964681/
         vm_config_suffix = ".config_vm"
         err = False
+        orig_last_hv = self.last_hv
         for file_name in os.listdir(self.config_folder):
             if file_name.endswith(vm_config_suffix):
                 vm_name = file_name[:-len(vm_config_suffix)]
                 vm = self.createVM(vm_name)
                 if vm.config_hv_name:
                     hv = self.nameToComp.get(vm.config_hv_name)
-                    if hv:
-                        self.launchVM( vm, hv )
+                    if not hv:
+                        error_msg = "%s does not exist." % hv
+                        error("Cannot run %s: %s\n" % (vm, error_msg))
+                    elif not isinstance(hv, Hypervisor):
+                        error_msg = "%s is not a hypervisor." % hv
+                        error("Cannot run %s: %s\n" % (vm, error_msg))
+                    elif not hv.is_enabled():
+                        error_msg = "%s is not enabled." % hv
+                        error("Cannot run %s: %s\n" % (vm, error_msg))
+                    else:
+                        self.launchVM(vm, hv)
                     if not vm.is_running():
                         err = True
+                    #FIXME: Pause VMs after this.
         if err:
             error("\nError occurred when resuming VMs!\n")
+        self.last_hv = orig_last_hv
+        return err
 
     def setup_controller_connection( self ):
         "Start the connection to the controller."
@@ -390,7 +483,7 @@ class CMSnet( object ):
     @classmethod
     def getPossibleVMScripts( cls ):
         "Dynamically obtain all possible scripts for VMs to run."
-        pass
+        return ["pizza"]   # TODO: Implement me!
 
 
 
