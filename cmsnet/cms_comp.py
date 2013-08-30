@@ -179,7 +179,6 @@ class VirtualMachine( CMSComponent ):
 
     def check_comp_config( self ):
         "Check for any previous configurations and adjust if necessary."
-        # See http://stackoverflow.com/questions/14574518/
         try:
             with open(self.get_config_file_name(), "r") as f:
                 config_raw = f.read()
@@ -191,7 +190,6 @@ class VirtualMachine( CMSComponent ):
                         setattr(self, attr, str(config[attr]))
                     else:
                         setattr(self, attr, config[attr])
-                f.close()                
         except IOError as e:
             info("No config exists for VM %s\n" % self.name)
 
@@ -208,11 +206,14 @@ class VirtualMachine( CMSComponent ):
                 config["stop_script"] = self.stop_script
                 config["config_hv_name"] = self.hv_name
                 config["_tenant_id"] = self._tenant_id
-                f.write(json.dumps(config))
+                try:
+                    with json.dumps(config) as j:
+                        f.write(j)
+                except:
+                    error("Fail to dump config via json for VM %s\n" % self.name)
                 f.flush()
-                f.close()
         except IOError as e:
-            info("Fail to update config for VM %s\n" % self.name)
+            error("Fail to update config for VM %s\n" % self.name)
 
     def is_running( self ):
         "Test if this VM image is running (or inactive) on any hypervisor."
@@ -316,12 +317,15 @@ class Hypervisor( CMSComponent ):
             with open(self.get_config_file_name(), "w") as f:
                 config = {}
                 config["vm_dist_limit"] = self.vm_dist_limit
-                config["enabled"] = self._enabled
-                f.write(json.dumps(config))
+                config["_enabled"] = self._enabled
+                try:
+                    with json.dumps(config) as j:
+                        f.write(j)
+                except:
+                    error("Fail to dump config via json for HV %s\n" % self.name)
                 f.flush()
-                f.close()
         except IOError as e:
-            info("Fail to update config for HV %s\n" % self.name)
+            error("Fail to update config for HV %s\n" % self.name)
 
     def get_num_VMs( self ):
         "Return the number of VMs running on this hypervisor."
