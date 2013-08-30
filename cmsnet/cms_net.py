@@ -469,7 +469,7 @@ class CMSnet( object ):
         "Check if hypervisor has reached its VM capacity limit (packed mode)."
         hv_limit = hv.vm_dist_limit
         limit = hv_limit if hv_limit else self.vm_dist_limit
-        return len(hv.nameToVMs) >= limit
+        return hv.get_num_VMs() >= limit
 
     def _vm_dist_random( self, old_hv=None ):
         "Choose a random HV."
@@ -480,7 +480,7 @@ class CMSnet( object ):
     def _vm_dist_sparse( self, old_hv=None ):
         "Choose HVs sparsely and evenly."
         hv_list = [hv for hv in self.HVs if hv is not old_hv]
-        min_hv = min(hv_list, key=lambda hv: len(hv.nameToVMs))
+        min_hv = min(hv_list, key=lambda hv: hv.get_num_VMs())
         return min_hv
 
     def _vm_dist_packed( self, old_hv=None ):
@@ -491,7 +491,7 @@ class CMSnet( object ):
             error_msg = "No hypervisor is available."
             error("\nCannot get HV: %s\n" % error_msg)
             return
-        max_hv = max(avail_hvs, key=lambda hv: len(hv.nameToVMs))
+        max_hv = max(avail_hvs, key=lambda hv: hv.get_num_VMs())
         return max_hv
 
     def _vm_dist_same( self, old_hv=None ):
@@ -643,6 +643,11 @@ class CMSnet( object ):
         if self.debug_flag1:
             print "EXEC: migrateVM(%s, %s):" % (vm, hv)
 
+        if hv is None:
+            hv = self._getNextDefaultHV(old_hv=vm.hv)
+            if hv is None:       # Some error occurred.
+                return           # Return and do nothing.
+
         assert vm in self.VMs
         assert hv in self.HVs
         assert isinstance(vm, VirtualMachine)
@@ -652,6 +657,7 @@ class CMSnet( object ):
 
         self._moveLink(vm.node, hv.node)
         vm.moveTo(hv)
+        self.last_hv = hv
         self.send_msg_to_controller("migrated", vm)
 
     def stopVM( self, vm ):
@@ -831,19 +837,30 @@ class CMSnet( object ):
         assert isinstance(hv, Hypervisor)
         assert hv.is_enabled()
 
-        self.not_implemented()
+        if hv.get_num_VMs() == 0:
+            warn("VMs already evicted from %s\n" % hv)
+            return
+        for vm in hv.nameToVMs.values():
+            self.migrateVM(vm)
 
-    def invictVMsToHV( self, hv, num_vms=1 ):
+    def invictVMsToHV( self, hv, max_num_vms=1 ):
         "Invict a number of inactive VMs to run on the hypervisor."
         if self.debug_flag1:
-            print "EXEC: invictVMsToHV(%s):" % (hv, num_vms)
+            print "EXEC: invictVMsToHV(%s):" % (hv, max_num_vms)
 
         assert hv in self.HVs
         assert isinstance(hv, Hypervisor)
         assert hv.is_enabled()
-        assert num_vms > 0
+        assert max_num_vms > 0
 
-        self.not_implemented()
+        count = 0
+        for vm in self.VMs:
+            if not vm.is_running():
+                self.launchVM(vm, hv)
+                count += 1
+            if count == max_num_vms:
+                break
+        info("Invicted %d VMs into %s\n" % (count, hv))
 
     def enableHV( self, hv ):
         "Enable a hypervisor."
@@ -855,7 +872,6 @@ class CMSnet( object ):
         assert not hv.is_enabled()
 
         hv.enable()
-        self.not_implemented()
 
     def disableHV( self, hv ):
         "Disable a hypervisor."
@@ -866,8 +882,8 @@ class CMSnet( object ):
         assert isinstance(hv, Hypervisor) 
         assert hv.is_enabled()
 
+        self.evictVMsFromHV(hv)
         hv.disable()
-        self.not_implemented()
 
     def killHV( self, hv ):
         "Kill a hypervisor."
@@ -878,7 +894,9 @@ class CMSnet( object ):
         assert isinstance(hv, Hypervisor) 
         assert hv.is_enabled()
 
-        self.not_implemented()
+        for vm in hv.nameToVMs.values():
+            self.stopVM(vm)
+        hv.disable()
 
 
 
