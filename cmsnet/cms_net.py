@@ -103,6 +103,7 @@ from mininet.term import cleanUpScreens, makeTerms
 from mininet.net import Mininet
 
 from cmsnet.cms_comp import CMSComponent, VirtualMachine, Hypervisor
+from cmsnet.cms_log import config_error
 import random
 import socket
 import json
@@ -169,12 +170,12 @@ class CMSnet( object ):
         self._hv_cycle_names = None
         self._cycle_pos_temp = None
 
-        self._have_old_config_params = False
+        self._allow_write_net_config = True
         if not self.new_config:
             self.check_net_config()
         self.mn = self.net_cls(**params)
-        if not self._have_old_config_params:
-            self.update_net_config()
+        self.update_net_config()
+        self.unlock_net_config()
 
     # BL: We now have four ways to look up components
     # This may (should?) be cleaned up in the future.
@@ -227,6 +228,7 @@ class CMSnet( object ):
 
     def start( self ):
         "Start Mininet, hypervisors, and a connection to the controller."
+        self.lock_net_config()
         self._tempStartDummy()
         self.mn.start()
         self.get_hypervisors()
@@ -237,15 +239,18 @@ class CMSnet( object ):
                 self.stop()
                 raise Exception("Stopping CMSnet. Please manually fix config.")
         self.setup_controller_connection()
+        self.unlock_net_config()
 
     def stop( self ):
         "Stop Mininet, VMs, and the connection to the controller."
+        self.lock_net_config()
         self.close_controller_connection()
         info( '*** Stopping %i VMs\n' % len( self.VMs ) )
         for vm in self.VMs:
             vm.shutdown()
         self.mn.stop()
         self._tempStopDummy()
+        self.unlock_net_config()
 
     def run( self, test, *args, **kwargs ):
         "Perform a complete start/test/stop cycle."
@@ -255,24 +260,46 @@ class CMSnet( object ):
         self.stop()
         return result
 
+    def get_config_file_name( self ):
+        "Return the file name of the configuration file."
+        return self.config_folder+"/cn.config_cmsnet"
+
+    def lock_net_config( self ):
+        "Lock the configuration file to prevent it from being written."
+        self._allow_write_net_config = False
+
+    def unlock_net_config( self ):
+        "Unlock the configuration file to allow it to be written."
+        self._allow_write_net_config = True
+
+    def is_net_config_locked( self ):
+        "Return whether the configuration file is locked from writing."
+        return not self._allow_write_net_config
+
     def check_net_config( self ):
         "Check for any previous CMSnet configurations and adjust if necessary."
-        config_raw = None
-        # See http://stackoverflow.com/questions/3642080/
-        # Or alternatively see http://blog.bitfoc.us/?p=328
-        try:
-            with open(self.config_folder+"/cn.config_cmsnet", "r") as f:
-                config_raw = f.read()
-        except IOError as e:
-            info("\nNo previous config exists for CMSnet\n")
-            return
-        self._have_old_config_params = True
+        self.lock_net_config()
 
+        # Part 1: Read from file
+        config_raw = None
         try:
-            config = {}
-            if config_raw:
-                config, l = defaultDecoder.raw_decode(config_raw)
-                assert isinstance(config, dict), "Config not a dictionary."
+            # See http://stackoverflow.com/questions/3642080/
+            # Or alternatively see http://blog.bitfoc.us/?p=328
+            with open(self.get_config_file_name(), "r") as f:
+                config_raw = f.read()
+        except IOError:
+            pass
+
+        if not config_raw:
+            info("No previous config exists for CMSnet.\n")
+            self.unlock_net_config()
+            return
+
+        # Part 2: Parse and apply from raw string
+        config = {}
+        try:
+            config, l = defaultDecoder.raw_decode(config_raw)
+            assert isinstance(config, dict), "Config not a dictionary."
             for attr in config:
                 if attr.startswith("topo"):     # Handle separately.
                     pass
@@ -300,55 +327,65 @@ class CMSnet( object ):
                 topo = topo_cls(**topo_opts)
                 self.params.update({'topo': topo})
             else:
-                warn("\nNo topology exists for CMSnet\n")
-        except Exception as e:
-            warn("\nConfig for CMSnet cannot be parsed.\n\t%s\n" % e)
+                warn("\nNo topology exists for CMSnet.\n")
+        except:
+            error_msg = "Config for CMSnet cannot be parsed."
+            config_error(error_msg, config=config, config_raw=config_raw)
             return
 
     def update_net_config( self ):
         "Update the CMSnet configurations file."
-        try:
-            config = {}
-            config["vm_dist_mode"] = self.vm_dist_mode
-            config["vm_dist_limit"] = self.vm_dist_limit
-            config["msg_level"] = self.msg_level
-            config["net_cls_name"] = self.net_cls.__name__
-            config["vm_cls_name"] = self.vm_cls.__name__
-            config["hv_cls_name"] = self.hv_cls.__name__
-            config["controller_ip"] = self.controller_ip
-            config["controller_port"] = self.controller_port
-            if self.last_hv:
-                config["_last_hv_name"] = self.last_hv.name
-            if self.hv_cycle:
-                config["_hv_cycle_names"] = [hv.name for hv in self.hv_cycle]
-            if self.cycle_pos >= 0:
-                config["_cycle_pos_temp"] = self.cycle_pos
-
-            topo = self.mn.topo
-            if topo:
-                topo_opts = {}
-                topo_opts["hv_num"] = topo.hv_num
-                topo_opts["fb_num"] = topo.fb_num
-                topo_opts["hopts"] = topo.hopts
-                topo_opts["sopts"] = topo.sopts
-                topo_opts["lopts"] = topo.lopts
-                config["topo_cls_name"] = topo.__class__.__name__
-                config["topo_opts"] = topo_opts
-
-            config_raw = json.dumps(config)
-        except Exception as e:
-            warn("\nConfig for CMSnet cannot be created.\n\t%s\n" % e)
+        if self.is_net_config_locked():
             return
 
-        # See http://stackoverflow.com/questions/3642080/
-        # Or alternatively see http://blog.bitfoc.us/?p=328
+        # Part 1: Get config data and dump to string
+        config = {}
+        config_raw = None
         try:
-            with open(self.config_folder+"/cn.config_cmsnet", "w") as f:
+            self.set_net_config(config)
+            config_raw = json.dumps(config)
+        except:
+            error_msg = "Config for CMSnet cannot be created."
+            config_error(error_msg, config=config)
+            return
+
+        # Part 2: Write to file
+        try:
+            with open(self.get_config_file_name(), "w") as f:
                 f.write(config_raw)
                 f.flush()
-        except IOError as e:
-            error("\nUnable to write to config file for CMSnet\n")
+        except IOError:
+            error_msg = "Unable to write to config file for CMSnet."
+            config_error(error_msg, config_raw=config_raw)
             return
+
+    def set_net_config( self, config ):
+        "Set the configurations of CMSnet to be saved."
+        config["vm_dist_mode"] = self.vm_dist_mode
+        config["vm_dist_limit"] = self.vm_dist_limit
+        config["msg_level"] = self.msg_level
+        config["net_cls_name"] = self.net_cls.__name__
+        config["vm_cls_name"] = self.vm_cls.__name__
+        config["hv_cls_name"] = self.hv_cls.__name__
+        config["controller_ip"] = self.controller_ip
+        config["controller_port"] = self.controller_port
+        if self.last_hv:
+            config["_last_hv_name"] = self.last_hv.name
+        if self.hv_cycle:
+            config["_hv_cycle_names"] = [hv.name for hv in self.hv_cycle]
+        if self.cycle_pos >= 0:
+            config["_cycle_pos_temp"] = self.cycle_pos
+
+        topo = self.mn.topo
+        if topo:
+            topo_opts = {}
+            topo_opts["hv_num"] = topo.hv_num
+            topo_opts["fb_num"] = topo.fb_num
+            topo_opts["hopts"] = topo.hopts
+            topo_opts["sopts"] = topo.sopts
+            topo_opts["lopts"] = topo.lopts
+            config["topo_cls_name"] = topo.__class__.__name__
+            config["topo_opts"] = topo_opts
 
     def get_hypervisors( self ):
         "Collect all hypervisors."
@@ -359,6 +396,9 @@ class CMSnet( object ):
                 hv = self.hv_cls( node, self.config_folder)
                 self.HVs.append(hv)
                 self.nameToComp[ node_name ] = hv
+                # If hv still needs config resuming:
+                #    hv.lock_comp_config()
+                #    hv.unlock_comp_config()
 
     def get_old_mode_params( self ):
         "Extract old configuration parameters for VM distribution modes."
@@ -406,6 +446,7 @@ class CMSnet( object ):
             if file_name.endswith(vm_config_suffix):
                 vm_name = file_name[:-len(vm_config_suffix)]
                 vm = self.createVM(vm_name)
+                vm.lock_comp_config()
                 if vm.config_hv_name:
                     hv = self.nameToComp.get(vm.config_hv_name)
                     if not hv:
@@ -422,6 +463,7 @@ class CMSnet( object ):
                     if not vm.is_running():
                         err = True
                     #FIXME: Pause VMs after this.
+                vm.unlock_comp_config()
         if err:
             error("\nError occurred when resuming VMs!\n")
         self.last_hv = orig_last_hv
