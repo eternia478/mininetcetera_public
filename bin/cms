@@ -36,12 +36,14 @@ from mininet.util import custom, customConstructor
 from mininet.util import buildTopo
 
 # Added
-from cmsnet.cms_topo import CMSLinearTopo, CMSHubAndSpokeTopo
-from cmsnet.cms_comp import VirtualMachine, Hypervisor
-from cmsnet.mininet_node_patch import POXSwitch, POXNormalSwitch, Dummy
-from cmsnet.cms_net import CMSnet
 from cmsnet.cms_cli import CMSCLI
+from cmsnet.cms_net import CMSnet
+from cmsnet.cms_comp import VirtualMachine, Hypervisor
+from cmsnet.cms_topo import CMSLinearTopo, CMSHubAndSpokeTopo
 from cmsnet.mininet_clean_patch import cleanup
+from cmsnet.mininet_net_patch import MininetPatch
+from cmsnet.mininet_node_patch import POXSwitch, POXNormalSwitch, Dummy
+
 
 # built in topologies, created only when run
 # Changed
@@ -294,7 +296,9 @@ class MininetRunner( object ):
             self.validate( self.options )
 
         inNamespace = self.options.innamespace
-        Net = MininetWithControlNet if inNamespace else Mininet
+        # Changed
+        if inNamespace: info("MininetWithControlNet not supported.\n")
+        Net = MininetPatch #MininetWithControlNet if inNamespace else Mininet
         ipBase = self.options.ipbase
         xterms = self.options.xterms
         mac = self.options.mac

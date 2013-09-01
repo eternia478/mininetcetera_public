@@ -1,36 +1,184 @@
+from mininet.net import Mininet
+from mininet.log import info, error, debug, warn
+from mininet.node import Host
+from mininet.term import cleanUpScreens, makeTerms
+import os
 
 
-# REMEMBER TO ALSO IMPORT THIS IN MININET LATER SINCE MOVELINK USES THIS:
+
+# REMEMBER TO ALSO IMPORT THESE IN MININET LATER:
 from mininet.util import moveIntf
+from mininet.node import Switch#, Dummy
 
 
+# Patching. REMOVE AFTER CHANGES TO MININET AND UNCOMMENT ABOVE EDIT.
+from cmsnet.mininet_node_patch import Dummy
 
 
-class MininetPatch(object):
+class MininetPatch(Mininet):
     """
-    NOTE: Please move the below code into Mininet. The code directly
-          below is modified to be compatible here.
-          Also, make the following changes in mininet.net.Mininet:
-           - Import Switch and Dummy from mininet.node module
+    NOTE: Please move the below code in the 2nd section into Mininet. Also,
+          like how it is done below in the 1st section, make the following
+          changes in mininet.net.Mininet:
+           - Import moveIntf from mininet.util
+           - Import Switch and Dummy from mininet.node
            - Add a self.dummies = [] attribute in __init__()
-           - Add the following to the top of build():
-                 info( '\n*** Adding dummy:\n' )
-                 self.addDummy()
+           - Add the following to the top of buildFromTopo():
+                 if not self.dummies:
+                     info( '*** Adding dummy\n' )
+                     self.addDummy()
            - Add the following to the bottom of startTerms():
                  self.terms += makeTerms( self.dummies, 'dummy' )
            - Add the following into the bottom of stop() before "Done":
                  info( '\n' )
-                 info( '*** Stopping %i dummies\n' % len(self.dummies) )
+                 info( '*** Stopping %i dummies\n' % len( self.dummies ) )
                  for dummy in self.dummies:
                      info( dummy.name + ' ' )
                      dummy.terminate()
-          And make the following changes in this class:
-           - Remove above patch importing and import the real POXNormalSwitch
-           - Remove the call to self._tempStartDummy() in start():
-           - Remove the call to self._tempStopDummy() in stop():
-           - Edit all self._moveLink and whatnot to self.mn.moveLink()
-           - Remove the below code after making sure everything runs correctly.
+
+          And make the following changes in the CMSnet class:
+           - Use real imports instead of patch imports
+           - Use Mininet instead of MininetPatch (in bin/cms)
+           - check_net_config get net_cls from real, not patch
     """
+    
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # The following code is to be changed:
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
+    def __init__( self, *args, **kwargs ):
+        #---------------------------------------------THIS NEEDS TO BE ADDED!
+        self.dummies = []
+        #--------------------------------------------------------------------
+
+        Mininet.__init__( self, *args, **kwargs )
+
+
+    def buildFromTopo( self, topo=None ):
+        """Build mininet from a topology object
+           At the end of this function, everything should be connected
+           and up."""
+
+        # Possibly we should clean up here and/or validate
+        # the topo
+        if self.cleanup:
+            pass
+
+        info( '*** Creating network\n' )
+
+        #---------------------------------------------THIS NEEDS TO BE ADDED!
+        if not self.dummies:
+            # Add a dummy node
+            info( '*** Adding dummy\n' )
+            self.addDummy()
+        #--------------------------------------------------------------------
+
+        if not self.controllers:
+            # Add a default controller
+            info( '*** Adding controller\n' )
+            classes = self.controller
+            if type( classes ) is not list:
+                classes = [ classes ]
+            for i, cls in enumerate( classes ):
+                self.addController( 'c%d' % i, cls )
+
+        info( '*** Adding hosts:\n' )
+        for hostName in topo.hosts():
+            self.addHost( hostName, **topo.nodeInfo( hostName ) )
+            info( hostName + ' ' )
+
+        info( '\n*** Adding switches:\n' )
+        for switchName in topo.switches():
+            self.addSwitch( switchName, **topo.nodeInfo( switchName) )
+            info( switchName + ' ' )
+
+        info( '\n*** Adding links:\n' )
+        for srcName, dstName in topo.links(sort=True):
+            src, dst = self.nameToNode[ srcName ], self.nameToNode[ dstName ]
+            params = topo.linkInfo( srcName, dstName )
+            srcPort, dstPort = topo.port( srcName, dstName )
+            self.addLink( src, dst, srcPort, dstPort, **params )
+            info( '(%s, %s) ' % ( src.name, dst.name ) )
+
+        info( '\n' )
+
+
+    def startTerms( self ):
+        "Start a terminal for each node."
+        if 'DISPLAY' not in os.environ:
+            error( "Error starting terms: Cannot connect to display\n" )
+            return
+        info( "*** Running terms on %s\n" % os.environ[ 'DISPLAY' ] )
+        cleanUpScreens()
+        #---------------------------------------------THIS NEEDS TO BE ADDED!
+        self.terms += makeTerms( self.dummies, 'dummy' )
+        #--------------------------------------------------------------------
+        self.terms += makeTerms( self.controllers, 'controller' )
+        self.terms += makeTerms( self.switches, 'switch' )
+        self.terms += makeTerms( self.hosts, 'host' )
+
+
+    def stop( self ):
+        "Stop the controller(s), switches and hosts"
+        if self.terms:
+            info( '*** Stopping %i terms\n' % len( self.terms ) )
+            self.stopXterms()
+        info( '*** Stopping %i switches\n' % len( self.switches ) )
+        for switch in self.switches:
+            info( switch.name + ' ' )
+            switch.stop()
+        info( '\n' )
+        info( '*** Stopping %i hosts\n' % len( self.hosts ) )
+        for host in self.hosts:
+            info( host.name + ' ' )
+            host.terminate()
+        info( '\n' )
+        info( '*** Stopping %i controllers\n' % len( self.controllers ) )
+        for controller in self.controllers:
+            info( controller.name + ' ' )
+            controller.stop()
+        #---------------------------------------------THIS NEEDS TO BE ADDED!
+        info( '\n' )
+        info( '*** Stopping %i dummies\n' % len( self.dummies ) )
+        for dummy in self.dummies:
+            info( dummy.name + ' ' )
+            dummy.terminate()
+        #--------------------------------------------------------------------
+        info( '\n*** Done\n' )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # The following code is to be added in:
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
 
 
 
