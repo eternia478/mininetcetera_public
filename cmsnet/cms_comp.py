@@ -27,24 +27,10 @@ from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
 from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
-import traceback
+
+from cmsnet.cms_log import config_error
 import json
 defaultDecoder = json.JSONDecoder()
-
-
-def config_error(error_msg, config=None, config_raw=None):
-    "Output error messages for config handling."
-    tb_str = traceback.format_exc()
-    tabbed_tb_str = "\t"+"\n\t".join(tb_str.rstrip().split("\n"))
-    error_info = [error_msg, tabbed_tb_str]
-
-    config_info = []
-    if config is not None:
-        config_info.append("\tconfig = %s" % config)
-    if config_raw is not None:
-        config_info.append("\tconfig_raw = %s" % config_raw)
-
-    error("\n".join([""] + error_info + config_info + [""]))
 
 
 class CMSComponent( object ):
