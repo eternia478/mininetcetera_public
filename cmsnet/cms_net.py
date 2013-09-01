@@ -461,8 +461,14 @@ class CMSnet( object ):
                     else:
                         self.launchVM(vm, hv)
                     if not vm.is_running():
+                        error("VM %s is not launched!\n" % vm)
                         err = True
-                    #FIXME: Pause VMs after this.
+                    else:
+                        if vm.config_is_paused:
+                            self.pauseVM(vm)
+                            if not vm.is_paused():
+                                error("VM %s is not paused!\n" % vm)
+                                err = True
                 vm.unlock_comp_config()
         if err:
             error("\nError occurred when resuming VMs!\n")
@@ -790,10 +796,39 @@ class CMSnet( object ):
         assert vm.is_running()
         assert hv.is_enabled()
 
-        self._moveLink(vm.node, hv.node)
+        if not vm.is_paused():
+            self._moveLink(vm.node, hv.node)
         vm.moveTo(hv)
         self.last_hv = hv
         self.send_msg_to_controller("migrated", vm)
+
+    def pauseVM( self, vm ):
+        "Pause a currently running VM."
+        if self.debug_flag1:
+            print "EXEC: pauseVM(%s):" % vm
+
+        assert vm in self.VMs
+        assert isinstance(vm, VirtualMachine)
+        assert vm.is_running()
+        assert not vm.is_paused()
+
+        vm.pause()
+        self._removeLink(vm.node)
+        self.send_msg_to_controller("paused", vm)
+
+    def resumeVM( self, vm ):
+        "Resume a currently paused VM."
+        if self.debug_flag1:
+            print "EXEC: resumeVM(%s):" % vm
+
+        assert vm in self.VMs
+        assert isinstance(vm, VirtualMachine)
+        assert vm.is_running()
+        assert vm.is_paused()
+
+        self._moveLink(vm.node, vm.hv.node)
+        vm.resume()
+        self.send_msg_to_controller("resumed", vm)
 
     def stopVM( self, vm ):
         "Stop a running image."
@@ -804,6 +839,8 @@ class CMSnet( object ):
         assert isinstance(vm, VirtualMachine)
         assert vm.is_running()
 
+        if vm.is_paused():
+            self.resumeVM(vm)
         vm.stop()
         self._removeLink(vm.node)
         self.send_msg_to_controller("destroyed", vm)
@@ -845,29 +882,6 @@ class CMSnet( object ):
         # TODO: Remove file!
         """
 
-    def pauseVM( self, vm ):
-        "Pause a currently running VM."
-        if self.debug_flag1:
-            print "EXEC: pauseVM(%s):" % vm
-
-        assert vm in self.VMs
-        assert isinstance(vm, VirtualMachine)
-        assert vm.is_running()
-        #assert not vm.is_paused()
-
-        self.not_implemented()
-
-    def resumeVM( self, vm ):
-        "Resume a currently paused VM."
-        if self.debug_flag1:
-            print "EXEC: resumeVM(%s):" % vm
-
-        assert vm in self.VMs
-        assert isinstance(vm, VirtualMachine)
-        assert vm.is_running()
-        #assert vm.is_paused()
-
-        self.not_implemented()
 
 
 

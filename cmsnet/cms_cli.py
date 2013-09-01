@@ -175,7 +175,7 @@ class CMSCLI( Cmd ):
         vm_name: Name of VM image. If None, ignore and return.
         Returns True if error occured, False otherwise.
         """
-        if not vm_name:     # Ignore NoneType names
+        if not vm_name:              # Ignore NoneType names
             return False
 
         if vm_name in self.cn.mn:
@@ -197,36 +197,7 @@ class CMSCLI( Cmd ):
 
         return False
 
-    def _check_vm_status( self, vm, exp_running=None ):
-        """
-        Check conditions for an existing VM.
-
-        vm: VM image instance. If None, ignore and return.
-        exp_running: Expected result of running or not. None if not matter.
-        Returns True if error occured, False otherwise.
-        """
-        if not vm:          # Ignore NoneType instances
-            return False
-
-        if not isinstance(vm, VirtualMachine):
-            if isinstance(vm, Hypervisor):
-                error('%s is a hypervisor\n' % vm.name)
-            else:
-                error('%s is another type of component\n' % vm.name)
-            return True
-
-        vm_running = vm.is_running()
-        if exp_running is not None:
-            if not vm_running and exp_running:
-                error('VM %s is currently inactive\n' % vm.name)
-                return True
-            elif vm_running and not exp_running:
-                error('VM %s is currently running\n' % vm.name)
-                return True
-
-        return False
-
-    def _check_vm_status_beta( self, vm, exp_running=None, exp_paused=None ):
+    def _check_vm( self, vm, exp_running=None, exp_paused=None ):
         """
         Check conditions for an existing VM.
 
@@ -235,8 +206,10 @@ class CMSCLI( Cmd ):
         exp_paused: Expected result of paused or not. None if not matter.
         Returns True if error occured, False otherwise.
         """
-        if not vm:          # Ignore NoneType instances
+        if not vm:                   # Ignore NoneType instances
             return False
+        if exp_paused is not None:   # exp_paused implies exp_running is True
+            exp_running = True      
 
         if not isinstance(vm, VirtualMachine):
             if isinstance(vm, Hypervisor):
@@ -246,7 +219,6 @@ class CMSCLI( Cmd ):
             return True
 
         vm_running = vm.is_running()
-        vm_paused = vm.is_paused()
         if exp_running is not None:
             if not vm_running and exp_running:
                 error('VM %s is currently inactive\n' % vm.name)
@@ -254,8 +226,9 @@ class CMSCLI( Cmd ):
             elif vm_running and not exp_running:
                 error('VM %s is currently running\n' % vm.name)
                 return True
+
+        vm_paused = vm.is_paused()
         if exp_paused is not None and vm_running:
-            assert exp_running
             if not vm_paused and exp_paused:
                 error('VM %s is currently running\n' % vm.name)
                 return True
@@ -265,7 +238,7 @@ class CMSCLI( Cmd ):
 
         return False
 
-    def _check_hv_status( self, hv, exp_enabled=None ):
+    def _check_hv( self, hv, exp_enabled=None ):
         """
         Check conditions for a hypervisor.
 
@@ -273,7 +246,7 @@ class CMSCLI( Cmd ):
         exp_enabled: Expected result of HV enabled or not. None if not matter.
         Returns True if error occured, False otherwise.
         """
-        if not hv:          # Ignore NoneType instances
+        if not hv:                   # Ignore NoneType instances
             return False
 
         if not isinstance(hv, Hypervisor):
@@ -294,27 +267,27 @@ class CMSCLI( Cmd ):
 
         return False
 
-    def _check_vm( self, name, exp_running=None, exp_paused=None ):
-        if not name:               # Ignore if not set by input.
-            return False, None     # NOTE: Already handled at parsing.
+    def _check_vm_name( self, name, exp_running=None, exp_paused=None ):
+        if not name:                 # Ignore if not set by input.
+            return False, None       # NOTE: Already handled at parsing.
 
         if name not in self.cn:
             error('No such VM image %s\n' % name)
             return True, None
         vm = self.cn[name]
-        err = self._check_vm_status(vm, exp_running=exp_running) #FIXME
-        return err, vm
+        er = self._check_vm(vm, exp_running=exp_running, exp_paused=exp_paused)
+        return er, vm
 
 
-    def _check_hv( self, name, exp_enabled=None ):
-        if not name:               # Ignore if not set by input.
-            return False, None     # NOTE: Already handled at parsing.
+    def _check_hv_name( self, name, exp_enabled=None ):
+        if not name:                 # Ignore if not set by input.
+            return False, None       # NOTE: Already handled at parsing.
 
         if name not in self.cn:
             error('No such hypervisor %s\n' % name)
             return True, None
         hv = self.cn[name]
-        err = self._check_hv_status(hv, exp_enabled=exp_enabled)
+        err = self._check_hv(hv, exp_enabled=exp_enabled)
         return err, hv
 
 
@@ -384,7 +357,7 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1, old_vm = self._check_vm(old_vm_name)
+        err1, old_vm = self._check_vm_name(old_vm_name)
         err2 = self._check_vm_name_available(vm_name)
 
         if not err1 and not err2:
@@ -406,8 +379,8 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1, vm = self._check_vm(vm_name, exp_running=False)
-        err2, hv = self._check_hv(hv_name, exp_enabled=True)
+        err1, vm = self._check_vm_name(vm_name, exp_running=False)
+        err2, hv = self._check_hv_name(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
             self.cn.launchVM(vm, hv)
@@ -428,45 +401,11 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err1, vm = self._check_vm(vm_name, exp_running=True)
-        err2, hv = self._check_hv(hv_name, exp_enabled=True)
+        err1, vm = self._check_vm_name(vm_name, exp_running=True)
+        err2, hv = self._check_hv_name(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
             self.cn.migrateVM(vm, hv)
-
-    def do_stop( self, line, cmd_name='stop' ):
-        "Stop a running image."
-        args = line.split()
-        vm_name = None
-
-        if len(args) == 1:
-            vm_name = args[0]
-        else:
-            usage = '%s vm_name' % cmd_name
-            error('invalid number of args: %s\n' % usage)
-            return
-
-        err, vm = self._check_vm(vm_name, exp_running=True)
-
-        if not err:
-            self.cn.stopVM(vm)
-
-    def do_rm( self, line, cmd_name='rm' ):
-        "Remove the virtual machine image from CMSnet."
-        args = line.split()
-        vm_name = None
-
-        if len(args) == 1:
-            vm_name = args[0]
-        else:
-            usage = '%s vm_name' % cmd_name
-            error('invalid number of args: %s\n' % usage)
-            return
-
-        err, vm = self._check_vm(vm_name)
-        
-        if not err:
-            self.cn.deleteVM(vm)
 
     def do_pause( self, line, cmd_name='pause' ):
         "Pause a currently running VM."
@@ -480,7 +419,7 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, vm = self._check_vm(vm_name, exp_running=True, exp_paused=False)
+        err, vm = self._check_vm_name(vm_name, exp_paused=False)
         
         if not err:
             self.cn.pauseVM(vm)
@@ -497,10 +436,45 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, vm = self._check_vm(vm_name, exp_running=True, exp_paused=True)
+        err, vm = self._check_vm_name(vm_name, exp_paused=True)
         
         if not err:
             self.cn.resumeVM(vm)
+
+    def do_stop( self, line, cmd_name='stop' ):
+        "Stop a running image."
+        args = line.split()
+        vm_name = None
+
+        if len(args) == 1:
+            vm_name = args[0]
+        else:
+            usage = '%s vm_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, vm = self._check_vm_name(vm_name, exp_running=True)
+
+        if not err:
+            self.cn.stopVM(vm)
+
+    def do_rm( self, line, cmd_name='rm' ):
+        "Remove the virtual machine image from CMSnet."
+        args = line.split()
+        vm_name = None
+
+        if len(args) == 1:
+            vm_name = args[0]
+        else:
+            usage = '%s vm_name' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, vm = self._check_vm_name(vm_name)
+        
+        if not err:
+            self.cn.deleteVM(vm)
+
 
 
 
@@ -590,7 +564,7 @@ class CMSCLI( Cmd ):
                     error('invalid number of args: %s\n' % usage)
                     return
                 last_hv_name = args[1]
-                err, last_hv = self._check_hv(last_hv_name)
+                err, last_hv = self._check_hv_name(last_hv_name)
                 if err: return
                 vm_dist_args["last_hv"] = last_hv
             elif vm_dist_mode in ["cycle", "cycleall"]:
@@ -608,7 +582,7 @@ class CMSCLI( Cmd ):
                     any_err = False
                     hv_cycle = []
                     for hv_name in args[2:]:
-                        err, hv = self._check_hv(hv_name)
+                        err, hv = self._check_hv_name(hv_name)
                         hv_cycle.append(hv)
                         any_err = any_err or err
                     if any_err: return
@@ -686,7 +660,7 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, hv = self._check_hv(hv_name, exp_enabled=True)
+        err, hv = self._check_hv_name(hv_name, exp_enabled=True)
 
         if not err:
             self.cn.evictVMsFromHV(hv)
@@ -713,7 +687,7 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, hv = self._check_hv(hv_name, exp_enabled=True)
+        err, hv = self._check_hv_name(hv_name, exp_enabled=True)
 
         if not err:
             self.cn.invictVMsToHV(hv, max_num_vms)
@@ -730,7 +704,7 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, hv = self._check_hv(hv_name, exp_enabled=False)
+        err, hv = self._check_hv_name(hv_name, exp_enabled=False)
 
         if not err:
             self.cn.enableHV(hv)
@@ -747,7 +721,7 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, hv = self._check_hv(hv_name, exp_enabled=True)
+        err, hv = self._check_hv_name(hv_name, exp_enabled=True)
 
         if not err:
             self.cn.disableHV(hv)
@@ -764,7 +738,7 @@ class CMSCLI( Cmd ):
             error('invalid number of args: %s\n' % usage)
             return
 
-        err, hv = self._check_hv(hv_name, exp_enabled=True)
+        err, hv = self._check_hv_name(hv_name, exp_enabled=True)
 
         if not err:
             self.cn.killHV(hv)
@@ -811,7 +785,7 @@ class CMSCLI( Cmd ):
             return
 
         err1 = self._check_vm_name_available(vm_name)
-        err2, hv = self._check_hv(hv_name, exp_enabled=True)
+        err2, hv = self._check_hv_name(hv_name, exp_enabled=True)
 
         if not err1 and not err2:
             self.do_add(vm_name)
@@ -876,7 +850,7 @@ class CMSCLI( Cmd ):
 
         for arg in args:
             vm_name = arg
-            err, vm = self._check_vm(vm_name, exp_running=False)
+            err, vm = self._check_vm_name(vm_name, exp_running=False)
             if not err:
                 self.cn.launchVM(vm)
 
@@ -891,7 +865,7 @@ class CMSCLI( Cmd ):
 
         for arg in args:
             vm_name = arg
-            err, vm = self._check_vm(vm_name, exp_running=True)
+            err, vm = self._check_vm_name(vm_name, exp_running=True)
             if not err:
                 self.cn.stopVM(vm)
 
@@ -906,7 +880,7 @@ class CMSCLI( Cmd ):
 
         for arg in args:
             vm_name = arg
-            err, vm = self._check_vm(vm_name)
+            err, vm = self._check_vm_name(vm_name)
             if not err:
                 self.cn.deleteVM(vm)
 

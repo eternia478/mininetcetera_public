@@ -175,11 +175,16 @@ class VirtualMachine( CMSComponent ):
         assert isinstance(node, Host)
         CMSComponent.__init__( self, node, config_folder )
 
-        self._hv = None
-        self.start_script = ""   # CHECK: Should these be modifiable?
-        self.stop_script = ""
         self._tenant_id = tenant_id
+        self._hv = None
+        self._is_paused = False
+        self.start_script = ""   # CHECK: Should these be modifiable?
+        self.pause_script = ""
+        self.resume_script = ""
+        self.stop_script = ""
+
         self.config_hv_name = None   # temp holder for HV name in config
+        self.config_is_paused = None # temp holder for paused status in config
 
         self.check_comp_config()
         self.update_comp_config()
@@ -248,16 +253,23 @@ class VirtualMachine( CMSComponent ):
 
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."
+        config["_tenant_id"] = self._tenant_id
         config["IP"] = self.IP
         config["MAC"] = self.MAC
-        config["start_script"] = self.start_script
-        config["stop_script"] = self.stop_script
         config["config_hv_name"] = self.hv_name
-        config["_tenant_id"] = self._tenant_id
+        config["config_is_paused"] = self.is_paused()
+        config["start_script"] = self.start_script
+        config["pause_script"] = self.pause_script
+        config["resume_script"] = self.resume_script
+        config["stop_script"] = self.stop_script
 
     def is_running( self ):
         "Test if this VM image is running (or inactive) on any hypervisor."
         return self.hv_name is not None
+
+    def is_paused( self ):
+        "Test if this VM image is paused (or running) on any hypervisor."
+        return self.is_running() and self._is_paused
 
     def cloneTo( self, new_vm ):
         "Clone information from this VM to the new VM image."
@@ -283,6 +295,22 @@ class VirtualMachine( CMSComponent ):
         assert hv is not None
         assert hv.is_enabled()
         self.hv = hv
+
+    def pause( self ):
+        "Pause the VM."
+        assert self.is_running()
+        assert not self.is_paused()
+        self._is_paused = True
+        self.update_comp_config()
+        self.node.cmd(self.pause_script)
+
+    def resume( self ):
+        "Resume the VM."
+        assert self.is_running()
+        assert self.is_paused()
+        self._is_paused = False
+        self.update_comp_config()
+        self.node.cmd(self.resume_script)
 
     def stop( self ):
         "Stop running the VM."
