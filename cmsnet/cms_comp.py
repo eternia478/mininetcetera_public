@@ -80,11 +80,81 @@ class CMSComponent( object ):
 
     def check_comp_config( self ):
         "Check for any previous configurations and adjust if necessary."
-        # NOTE: This should be overridden.
-        pass
+        config_raw = None
+        # See http://stackoverflow.com/questions/3642080/
+        # Or alternatively see http://blog.bitfoc.us/?p=328
+        try:
+            with open(self.get_config_file_name(), "r") as f:
+                config_raw = f.read()
+        except IOError as e:
+            info("No previous config exists for %s.\n" % self.name)
+            return
+
+        config = {}
+        try:
+            if config_raw:
+                config, l = defaultDecoder.raw_decode(config_raw)
+        except Exception as e:
+            error_msg = "Previous config for %s cannot be parsed." % self.name
+            error_info_1 = "\tError: %s" % e
+            error_info_2 = "\tconfig_raw = %s" % config_raw
+            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
+            return
+
+        try:
+            assert isinstance(config, dict), "Config not a dictionary."
+            for attr in config:
+                if attr.endswith("cls_name"):  # UNUSED FOR NOW.
+                    pass
+                elif isinstance(config[attr], basestring):
+                    setattr(self, attr, str(config[attr]))
+                else:
+                    setattr(self, attr, config[attr])
+        except Exception as e:
+            error_msg = "Previous config for %s cannot be applied." % self.name
+            error_info_1 = "\tError: %s" % e
+            error_info_2 = "\tconfig = %s" % config
+            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
+            return
 
     def update_comp_config( self ):
         "Update the configurations for this component."
+        if not self._have_comp_config:
+            return
+
+        config = {}
+        try:
+            self.set_comp_config(config)
+        except Exception as e:
+            error_msg = "Config for %s cannot be created." % self.name
+            error_info_1 = "\tError: %s" % e
+            error_info_2 = "\tconfig = %s" % config
+            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
+            return
+
+        config_raw = None
+        try:
+            config_raw = json.dumps(config)
+        except Exception as e:
+            error_msg = "Config for %s cannot be dumped." % self.name
+            error_info_1 = "\tError: %s" % e
+            error_info_2 = "\tconfig = %s" % config
+            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
+            return
+
+        try:
+            with open(self.get_config_file_name(), "w") as f:
+                f.write(config_raw)
+                f.flush()
+        except IOError as e:
+            error_msg = "Unable to write to config file for %s." % self.name
+            error_info_1 = "\tError: %s" % e
+            error_info_2 = "\tconfig_raw = %s" % config_raw
+            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
+            return
+
+    def set_comp_config( self, config ):
+        "Set the configurations of this component to be saved."
         # NOTE: This should be overridden.
         pass
 
@@ -177,43 +247,14 @@ class VirtualMachine( CMSComponent ):
         "Return the file name of the configuration file."
         return self._config_folder+"/"+self.name+".config_vm"
 
-    def check_comp_config( self ):
-        "Check for any previous configurations and adjust if necessary."
-        try:
-            with open(self.get_config_file_name(), "r") as f:
-                config_raw = f.read()
-                config = {}
-                if config_raw:
-                    config, l = defaultDecoder.raw_decode(config_raw)
-                for attr in config:
-                    if isinstance(config[attr], basestring):
-                        setattr(self, attr, str(config[attr]))
-                    else:
-                        setattr(self, attr, config[attr])
-        except IOError as e:
-            info("No config exists for VM %s\n" % self.name)
-
-    def update_comp_config( self ):
-        "Update the configurations for this component."
-        if not self._have_comp_config:
-            return
-        try:
-            with open(self.get_config_file_name(), "w") as f:
-                config = {}
-                config["IP"] = self.IP
-                config["MAC"] = self.MAC
-                config["start_script"] = self.start_script
-                config["stop_script"] = self.stop_script
-                config["config_hv_name"] = self.hv_name
-                config["_tenant_id"] = self._tenant_id
-                try:
-                    with json.dumps(config) as j:
-                        f.write(j)
-                except:
-                    error("Fail to dump config via json for VM %s\n" % self.name)
-                f.flush()
-        except IOError as e:
-            error("Fail to update config for VM %s\n" % self.name)
+    def set_comp_config( self, config ):
+        "Set the configurations of this component to be saved."
+        config["IP"] = self.IP
+        config["MAC"] = self.MAC
+        config["start_script"] = self.start_script
+        config["stop_script"] = self.stop_script
+        config["config_hv_name"] = self.hv_name
+        config["_tenant_id"] = self._tenant_id
 
     def is_running( self ):
         "Test if this VM image is running (or inactive) on any hypervisor."
@@ -304,28 +345,10 @@ class Hypervisor( CMSComponent ):
         "Return the file name of the configuration file."
         return self._config_folder+"/"+self.name+".config_hv"
 
-    def check_comp_config( self ):
-        "Check for any previous configurations and adjust if necessary."
-        # TODO: Implement me.
-        pass
-
-    def update_comp_config( self ):
-        "Update the configurations for this component."
-        if not self._have_comp_config:
-            return
-        try:
-            with open(self.get_config_file_name(), "w") as f:
-                config = {}
-                config["vm_dist_limit"] = self.vm_dist_limit
-                config["_enabled"] = self._enabled
-                try:
-                    with json.dumps(config) as j:
-                        f.write(j)
-                except:
-                    error("Fail to dump config via json for HV %s\n" % self.name)
-                f.flush()
-        except IOError as e:
-            error("Fail to update config for HV %s\n" % self.name)
+    def set_comp_config( self, config ):
+        "Set the configurations of this component to be saved."
+        config["vm_dist_limit"] = self.vm_dist_limit
+        config["_enabled"] = self._enabled
 
     def get_num_VMs( self ):
         "Return the number of VMs running on this hypervisor."
