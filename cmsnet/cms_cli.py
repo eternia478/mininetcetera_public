@@ -948,21 +948,24 @@ class CMSCLI( Cmd ):
         else:
             for arg in args:
                 if arg not in self.cn:
-                    error( "component '%s' not in network\n" % arg )
+                    error( "Component '%s' not found.\n" % arg )
                 else:
                     comp = self.cn[ arg ]
-                    self.cn.mn.terms += makeTerms( [ comp.node ], term = term )
+                    self.cn.makeTerms(comp, term=term)
 
     def do_x( self, line ):
         """Create an X11 tunnel to the given component,
            optionally starting a client."""
         args = line.split()
         if not args:
-            error( 'usage: x comp [cmd args]...\n' )
+            error( 'usage: x comp [cmd args]\n' )
         else:
-            comp = self.cn[ args[ 0 ] ]
-            cmd = args[ 1: ]
-            self.cn.mn.terms += runX11( comp.node, cmd )
+            if args[0] not in self.cn:
+                error( "Component '%s' not found.\n" % args[0] )
+            else:
+                comp = self.cn[ args[ 0 ] ]
+                cmd = args[ 1: ]
+                self.cn.makeX11(comp, cmd)
 
     def do_gterm( self, line ):
         "Spawn gnome-terminal(s) for the given component(s)."

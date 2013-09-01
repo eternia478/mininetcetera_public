@@ -68,6 +68,7 @@ class MininetPatch(object):
         # Part 0: Main assertions.
         assert hostName not in self.nameToNode
         assert self.built
+        host_terms = []
 
         # Part 1: Getting dummy.
         dummy = self.nameToNode.get("dummy", None)
@@ -109,7 +110,8 @@ class MininetPatch(object):
                 error( "Error starting terms: Cannot connect to display\n" )
                 return
             info( "*** Running term on %s\n" % os.environ[ 'DISPLAY' ] )
-            self.terms += makeTerms( [host], 'host' )
+            host_terms = makeTerms( [ host ], 'host' )
+            self.terms += host_terms
 
         # if self.autoStaticArp:
         #     self.staticArp()
@@ -122,7 +124,7 @@ class MininetPatch(object):
         # self.built = True
         self.built = True
         
-        return host
+        return host, host_terms
 
     def moveLink( self, node1, node2, intf1_name=None, intf2_name=None ):
         """

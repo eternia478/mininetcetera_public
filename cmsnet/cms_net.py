@@ -510,7 +510,21 @@ class CMSnet( object ):
                 self.controller_socket.send(json.dumps(msg))
             except Exception,e:
                 warn("\nCannot send to controller: %s\n" % str(e))
-            
+
+    def makeTerms( self, comp, term='xterm' ):
+        "Spawn terminals for the given component."
+        new_terms = makeTerms( [ comp.node ], term=term )
+        self.mn.terms += new_terms
+        if isinstance(comp, VirtualMachine):
+            comp.terms += new_terms
+
+    def makeX11( self, comp, cmd ):
+        "Create an X11 tunnel for the given component."
+        new_terms = runX11( comp.node, cmd )
+        self.mn.terms += new_terms
+        if isinstance(comp, VirtualMachine):
+            comp.terms += new_terms
+
     @classmethod
     def getPossibleVMDistModes( cls ):
         "Dynamically obtain all possible VM distribution mode names."
@@ -532,10 +546,6 @@ class CMSnet( object ):
     def getPossibleVMScripts( cls ):
         "Dynamically obtain all possible scripts for VMs to run."
         return ["pizza"]   # TODO: Implement me!
-
-
-
-
 
 
 
@@ -719,10 +729,11 @@ class CMSnet( object ):
 
         # TODO: Handle vm_script (assert and passing in).
 
-        host = self._createHostAtDummy(vm_name, **params)
+        host, host_terms = self._createHostAtDummy(vm_name, **params)
         if not vm_cls:
             vm_cls = self.vm_cls
         vm = vm_cls(host, self.config_folder)
+        vm.terms = host_terms
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm
 
@@ -852,35 +863,31 @@ class CMSnet( object ):
 
         assert vm in self.VMs
         assert isinstance(vm, VirtualMachine)
+
         if vm.is_running():
             self.stopVM(vm)
 
-        # self.not_implemented()
-        
-        self.stopVM(vm)
+        if vm.terms:
+            if self.debug_flag1:
+                info( '*** Stopping %i terms\n' % len(vm.terms) )
+            for term in vm.terms:
+                try:
+                    os.kill( term.pid, signal.SIGKILL )
+                except:
+                    pass
+                self.mn.terms.remove(term)
+            vm.terms = []
+
+        if self.debug_flag1:
+            info( '*** Stopping host: %s\n' % vm.name )
+        vm.node.terminate()
+        self.mn.hosts.remove(vm.node)
+        del self.mn.nameToNode[ vm.node.name ]
+
+        info( '*** Removing VM: %s\n' % vm.name )
         self.VMs.remove(vm)
         del self.nameToComp[ vm.name ]
-        info( '*** Stopping host: %s\n' % vm.name ) 
-        vm.node.terminate()
-        # Remove the file
-        os.remove(vm.get_config_file_name()) 
-
-        """
-        # NOTE: many details on this one is hard to do, so
-        #  we'll leave it for now. We need to remove intfs, processes,
-        #  xterms, and do a bunch of stuff. 
-
-        self.stopVM(vm_name)
-        vm = self.nameToComp[vm_name]
-        self.VMs.remove(vm)
-        del self.nameToComp[ vm_name ]
-
-        info( '*** Stopping host: %s\n' % vm_name ) )
-        # FIXME: Get this node's xterm.
-        vm.node.terminate()
-
-        # TODO: Remove file!
-        """
+        vm.remove()
 
 
 
@@ -1152,6 +1159,7 @@ class CMSnet( object ):
         # Part 0: Main assertions.
         assert hostName not in self.mn.nameToNode
         assert self.mn.built
+        host_terms = []
 
         # Part 1: Getting dummy.
         dummy = self.mn.nameToNode.get("dummy", None)
@@ -1193,7 +1201,8 @@ class CMSnet( object ):
                 error( "Error starting terms: Cannot connect to display\n" )
                 return
             info( "*** Running term on %s\n" % os.environ[ 'DISPLAY' ] )
-            self.mn.terms += makeTerms( [host], 'host' )
+            host_terms = makeTerms( [ host ], 'host' )
+            self.mn.terms += host_terms
 
         # if self.autoStaticArp:
         #     self.staticArp()
@@ -1206,7 +1215,7 @@ class CMSnet( object ):
         # self.built = True
         self.mn.built = True
         
-        return host
+        return host, host_terms
 
     def _moveLink( self, node1, node2, intf1_name=None, intf2_name=None ):
         """

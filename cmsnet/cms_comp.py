@@ -185,6 +185,7 @@ class VirtualMachine( CMSComponent ):
 
         self.config_hv_name = None   # temp holder for HV name in config
         self.config_is_paused = None # temp holder for paused status in config
+        self.terms = []              # temp holder for terms to kill on removal
 
         self.check_comp_config()
         self.update_comp_config()
@@ -317,6 +318,13 @@ class VirtualMachine( CMSComponent ):
         assert self.is_running()
         self.hv = None
         self.node.cmd(self.stop_script)
+
+    def remove( self ):
+        "Remove traces of the VM from existence."
+        try:      # Remove config file.
+            os.remove(self.get_config_file_name())
+        except:
+            pass
 
     def shutdown( self ):
         "Shutdown VM when CMSnet is shutting down."
