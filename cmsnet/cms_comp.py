@@ -27,8 +27,25 @@ from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
 from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
+import traceback
 import json
 defaultDecoder = json.JSONDecoder()
+
+
+def config_error(error_msg, config=None, config_raw=None):
+    "Output error messages for config handling."
+    tb_str = traceback.format_exc()
+    tabbed_tb_str = "\t"+"\n\t".join(tb_str.rstrip().split("\n"))
+    error_info = [error_msg, tabbed_tb_str]
+
+    config_info = []
+    if config is not None:
+        config_info.append("\tconfig = %s" % config)
+    if config_raw is not None:
+        config_info.append("\tconfig_raw = %s" % config_raw)
+
+    error("\n".join([""] + error_info + config_info + [""]))
+
 
 class CMSComponent( object ):
     """A component of the cloud network. This is simply a wrapper for Node
@@ -80,41 +97,32 @@ class CMSComponent( object ):
 
     def check_comp_config( self ):
         "Check for any previous configurations and adjust if necessary."
+
+        # Part 1: Read from file
         config_raw = None
-        # See http://stackoverflow.com/questions/3642080/
-        # Or alternatively see http://blog.bitfoc.us/?p=328
         try:
+            # See http://stackoverflow.com/questions/3642080/
+            # Or alternatively see http://blog.bitfoc.us/?p=328
             with open(self.get_config_file_name(), "r") as f:
                 config_raw = f.read()
-        except IOError as e:
+        except IOError:
             info("No previous config exists for %s.\n" % self.name)
             return
 
+        # Part 2: Parse and apply from raw string
         config = {}
         try:
             if config_raw:
                 config, l = defaultDecoder.raw_decode(config_raw)
-        except Exception as e:
-            error_msg = "Previous config for %s cannot be parsed." % self.name
-            error_info_1 = "\tError: %s" % e
-            error_info_2 = "\tconfig_raw = %s" % config_raw
-            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
-            return
-
-        try:
             assert isinstance(config, dict), "Config not a dictionary."
             for attr in config:
-                if attr.endswith("cls_name"):  # UNUSED FOR NOW.
-                    pass
-                elif isinstance(config[attr], basestring):
+                if isinstance(config[attr], basestring):
                     setattr(self, attr, str(config[attr]))
                 else:
                     setattr(self, attr, config[attr])
-        except Exception as e:
-            error_msg = "Previous config for %s cannot be applied." % self.name
-            error_info_1 = "\tError: %s" % e
-            error_info_2 = "\tconfig = %s" % config
-            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
+        except:
+            error_msg = "Previous config for %s cannot be parsed." % self.name
+            config_error(error_msg, config=config, config_raw=config_raw)
             return
 
     def update_comp_config( self ):
@@ -122,35 +130,25 @@ class CMSComponent( object ):
         if not self._have_comp_config:
             return
 
+        # Part 1: Get config data and dump to string
         config = {}
-        try:
-            self.set_comp_config(config)
-        except Exception as e:
-            error_msg = "Config for %s cannot be created." % self.name
-            error_info_1 = "\tError: %s" % e
-            error_info_2 = "\tconfig = %s" % config
-            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
-            return
-
         config_raw = None
         try:
+            self.set_comp_config(config)
             config_raw = json.dumps(config)
-        except Exception as e:
-            error_msg = "Config for %s cannot be dumped." % self.name
-            error_info_1 = "\tError: %s" % e
-            error_info_2 = "\tconfig = %s" % config
-            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
+        except:
+            error_msg = "Config for %s cannot be created." % self.name
+            config_error(error_msg, config=config)
             return
 
+        # Part 2: Write to file
         try:
             with open(self.get_config_file_name(), "w") as f:
                 f.write(config_raw)
                 f.flush()
-        except IOError as e:
+        except IOError:
             error_msg = "Unable to write to config file for %s." % self.name
-            error_info_1 = "\tError: %s" % e
-            error_info_2 = "\tconfig_raw = %s" % config_raw
-            error("\n".join(["", error_msg, error_info_1, error_info_2, ""]))
+            config_error(error_msg, config_raw=config_raw)
             return
 
     def set_comp_config( self, config ):
