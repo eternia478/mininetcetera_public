@@ -62,7 +62,7 @@ class CMSComponent( object ):
         assert isinstance(config_folder, basestring)
         self._node = node
         self._config_folder = config_folder
-        self._have_comp_config = False
+        self._allow_write_comp_config = True
 
     @property
     def node( self ):
@@ -95,8 +95,21 @@ class CMSComponent( object ):
         # NOTE: This should be overridden.
         return self._config_folder+"/"+self.name+".config_cmscomp"
 
+    def lock_comp_config( self ):
+        "Lock the configuration file to prevent it from being written."
+        self._allow_write_comp_config = False
+
+    def unlock_comp_config( self ):
+        "Unlock the configuration file to allow it to be written."
+        self._allow_write_comp_config = True
+
+    def is_comp_config_locked( self ):
+        "Return whether the configuration file is locked from writing."
+        return not self._allow_write_comp_config
+
     def check_comp_config( self ):
         "Check for any previous configurations and adjust if necessary."
+        self.lock_comp_config()
 
         # Part 1: Read from file
         config_raw = None
@@ -106,14 +119,17 @@ class CMSComponent( object ):
             with open(self.get_config_file_name(), "r") as f:
                 config_raw = f.read()
         except IOError:
+            pass
+
+        if not config_raw:
             info("No previous config exists for %s.\n" % self.name)
+            self.unlock_comp_config()
             return
 
         # Part 2: Parse and apply from raw string
         config = {}
         try:
-            if config_raw:
-                config, l = defaultDecoder.raw_decode(config_raw)
+            config, l = defaultDecoder.raw_decode(config_raw)
             assert isinstance(config, dict), "Config not a dictionary."
             for attr in config:
                 if isinstance(config[attr], basestring):
@@ -127,7 +143,7 @@ class CMSComponent( object ):
 
     def update_comp_config( self ):
         "Update the configurations for this component."
-        if not self._have_comp_config:
+        if self.is_comp_config_locked():
             return
 
         # Part 1: Get config data and dump to string
@@ -177,12 +193,11 @@ class VirtualMachine( CMSComponent ):
         self.start_script = ""   # CHECK: Should these be modifiable?
         self.stop_script = ""
         self._tenant_id = tenant_id
-
         self.config_hv_name = None   # temp holder for HV name in config
+
         self.check_comp_config()
-        self._have_comp_config = True
-        if not self.config_hv_name:  # Do not overwrite original running status
-            self.update_comp_config()
+        self.update_comp_config()
+        self.unlock_comp_config()
 
     @CMSComponent.name.setter
     def name( self, name ):
@@ -293,7 +308,7 @@ class VirtualMachine( CMSComponent ):
         "Shutdown VM when CMSnet is shutting down."
         if not self.is_running():
             return
-        self._have_comp_config = False  # Prevent adjustments to config file.
+        self.lock_comp_config()    # Prevent adjustments to config file.
         self.stop()
 
 
@@ -316,8 +331,8 @@ class Hypervisor( CMSComponent ):
         self._vm_dist_limit = vm_dist_limit
 
         self.check_comp_config()
-        self._have_comp_config = True
         self.update_comp_config()
+        self.unlock_comp_config()
 
     @CMSComponent.name.setter
     def name( self, name ):
