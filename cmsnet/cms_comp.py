@@ -282,7 +282,7 @@ class VirtualMachine( CMSComponent ):
         new_vm._tenant_id = self.tenant_id
         # FIXME: Copy script image files in file system.
 
-    def launch( self, hv ):
+    def launchOn( self, hv ):
         "Initialize the VM on the input hypervisor."
         assert not self.is_running()
         assert hv is not None

@@ -786,7 +786,7 @@ class CMSnet( object ):
         assert hv.is_enabled()
 
         self._moveLink(vm.node, hv.node)
-        vm.launch(hv)
+        vm.launchOn(hv)
         self.last_hv = hv
         self.send_msg_to_controller("instantiated", vm)
 
