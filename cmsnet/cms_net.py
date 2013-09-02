@@ -444,6 +444,10 @@ class CMSnet( object ):
         vm_config_suffix = ".config_vm"
         err = False
         orig_last_hv = self.last_hv
+        orig_debug_flag1 = self.debug_flag1
+        orig_mn_debug_flag1 = self.mn.debug_flag1
+        self.debug_flag1 = False
+        self.mn.debug_flag1 = False
         for file_name in os.listdir(self.config_folder):
             if file_name.endswith(vm_config_suffix):
                 vm_name = file_name[:-len(vm_config_suffix)]
@@ -474,7 +478,26 @@ class CMSnet( object ):
                 vm.unlock_comp_config()
         if err:
             error("\nError occurred when resuming VMs!\n")
+        else:
+            launched = []
+            paused = []
+            info("\n*** Resumed %i VMs:\n" % len(self.VMs))
+            for vm in self.VMs:
+                info("%s " % vm)
+                if vm.is_running(): launched.append(vm)
+                if vm.is_paused():  paused.append(vm)
+            info("\n")
+            info("*** Relaunched %i VMs:\n" % len(launched))
+            for vm in launched:
+                info("%s " % vm)
+            info("\n")
+            info("*** Repaused %i VMs:\n" % len(paused))
+            for vm in paused:
+                info("%s " % vm)
+            info("\n")
         self.last_hv = orig_last_hv
+        self.debug_flag1 = orig_debug_flag1
+        self.mn.debug_flag1 = orig_mn_debug_flag1
         return err
 
     def setup_controller_connection( self ):

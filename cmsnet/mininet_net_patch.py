@@ -229,9 +229,11 @@ class MininetPatch(Mininet):
 
         # if self.topo:
         #     self.buildFromTopo( self.topo )
-        info( '*** Adding host: %s\n' % hostName )
+        if self.debug_flag1:
+            info( '*** Adding host: %s\n' % hostName )
         host = self.addHost( hostName, **params )
-        info( '*** Adding link: (%s, %s)\n' % ( host.name, dummy.name ) )
+        if self.debug_flag1:
+            info( '*** Adding link: (%s, %s)\n' % ( host.name, dummy.name ) )
         hostPort = host.newPort()
         dummyPort = dummy.newPort()
         self.addLink( host, dummy, hostPort, dummyPort )
@@ -243,7 +245,8 @@ class MininetPatch(Mininet):
 
         # info( '*** Configuring hosts\n' )
         # self.configHosts()
-        info( '*** Configuring host: %s\n' % host.name )
+        if self.debug_flag1:
+            info( '*** Configuring host: %s\n' % host.name )
         intf = host.defaultIntf()
         if intf:
             host.configDefault()
@@ -257,7 +260,8 @@ class MininetPatch(Mininet):
             if 'DISPLAY' not in os.environ:
                 error( "Error starting terms: Cannot connect to display\n" )
                 return
-            info( "*** Running term on %s\n" % os.environ[ 'DISPLAY' ] )
+            if self.debug_flag1:
+                info( "*** Running term on %s\n" % os.environ[ 'DISPLAY' ] )
             host_terms = makeTerms( [ host ], 'host' )
             self.terms += host_terms
 
