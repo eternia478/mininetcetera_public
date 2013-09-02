@@ -74,11 +74,11 @@ class CMSTopo(Topo):
 class CMSLinearTopo(CMSTopo):
     "Linear topology of hv_num HV-switches."
 
-    def __init__(self, **opts):
+    def __init__(self, *args, **opts):
         """Init.
            opts: Options"""
 
-        super(CMSLinearTopo, self).__init__(**opts)
+        super(CMSLinearTopo, self).__init__(*args, **opts)
 
         lastSwitch = None
         for i in irange(1, self.hv_num):
@@ -93,11 +93,11 @@ class CMSLinearTopo(CMSTopo):
 class CMSHubAndSpokeTopo(CMSTopo):
     "Hub-and-spoke topology of hv_num HV-switches around 1 fabric switch."
 
-    def __init__(self, **opts):
+    def __init__(self, *args, **opts):
         """Init.
            opts: Options"""
 
-        super(CMSHubAndSpokeTopo, self).__init__(**opts)
+        super(CMSHubAndSpokeTopo, self).__init__(*args, **opts)
 
         fabric = self.addFabricSwitch( 'fabric'+str(self.hv_num+1) )
 
