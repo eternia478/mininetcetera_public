@@ -238,7 +238,9 @@ class CMSnet( object ):
             err2 = self.get_old_VMs()
             if err1 or err2:
                 self.stop()
-                raise Exception("Stopping CMSnet. Please manually fix config.")
+                error("Stopping CMSnet. Please manually fix config.\n")
+                import sys
+                sys.exit(1)
         self.setup_controller_connection()
         self.unlock_net_config()
 
@@ -456,7 +458,7 @@ class CMSnet( object ):
                 if vm.config_hv_name:
                     hv = self.nameToComp.get(vm.config_hv_name)
                     if not hv:
-                        error_msg = "%s does not exist." % hv
+                        error_msg = "%s does not exist." % vm.config_hv_name
                         error("Cannot run %s: %s\n" % (vm, error_msg))
                     elif not isinstance(hv, Hypervisor):
                         error_msg = "%s is not a hypervisor." % hv
@@ -588,10 +590,10 @@ class CMSnet( object ):
            cls: custom switch class/constructor (optional)
            returns: added switch
            side effect: params has extra parameter cmsnet."""
-        if self.built:
+        if self.mn.built:
             error("Cannot add switch; Mininet already built.")
             return
-        params.update({"cms_net": "hypervisor"})
+        params.update({"cms_type": "hypervisor"})
         return self.mn.addSwitch(name, cls=cls, **params)
 
     def addFabricSwitch( self, name, **params ):
@@ -600,10 +602,10 @@ class CMSnet( object ):
            cls: custom switch class/constructor (optional)
            returns: added switch
            side effect: params has extra parameter cmsnet."""
-        if self.built:
+        if self.mn.built:
             error("Cannot add switch; Mininet already built.")
             return
-        params.update({"cms_net": "fabric", "cls": POXNormalSwitch})
+        params.update({"cms_type": "fabric", "cls": POXNormalSwitch})
         return self.mn.addSwitch(name, **params)
 
 
