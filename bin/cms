@@ -313,7 +313,7 @@ class MininetRunner( object ):
                      vm_dist_mode=vm_dist_mode, vm_dist_limit=vm_dist_limit,
                      msg_level=msg_level,
                      net_cls=Net, vm_cls=vm_cls, hv_cls=hv_cls,
-                     controller_ip=controller_ip, 
+                     controller_ip=controller_ip,
                      controller_port=controller_port,
 
                      topo=topo,

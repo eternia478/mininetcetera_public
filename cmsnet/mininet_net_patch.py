@@ -41,7 +41,7 @@ class MininetPatch(Mininet):
            - Use Mininet instead of MininetPatch (in bin/cms)
            - check_net_config get net_cls from real, not patch
     """
-    
+
 
 
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
@@ -185,7 +185,7 @@ class MininetPatch(Mininet):
     def addDummy( self, name='dummy', cls=Dummy, **params ):
         """
         Add dummy.
-        
+
         dummy: Dummy class
         """
         if not cls:
@@ -239,7 +239,7 @@ class MininetPatch(Mininet):
         self.addLink( host, dummy, hostPort, dummyPort )
 
         # if ( self.inNamespace ):
-        #     self.configureControlNetwork()        
+        #     self.configureControlNetwork()
         if ( self.inNamespace ):
             self.configureControlNetwork()
 
@@ -251,7 +251,7 @@ class MininetPatch(Mininet):
         if intf:
             host.configDefault()
         else:       # Don't configure nonexistent intf
-            host.configDefault( ip=None, mac=None ) 
+            host.configDefault( ip=None, mac=None )
         host.cmd( 'ifconfig lo up' )
 
         # if self.xterms:
@@ -275,7 +275,7 @@ class MininetPatch(Mininet):
 
         # self.built = True
         self.built = True
-        
+
         return host, host_terms
 
     def moveLink( self, node1, node2, intf1_name=None, intf2_name=None ):
@@ -321,7 +321,7 @@ class MininetPatch(Mininet):
 
         # Part 1.5: Call detach() on switch.
         if hasattr(node1_other, 'detach'):
-            if self.debug_flag1: 
+            if self.debug_flag1:
                 print "Detach %s from %s" % (intf1_other, node1_other)
             node1_other.detach(intf1_other)
 
@@ -444,5 +444,3 @@ class MininetPatch(Mininet):
         self.removeLink(node1, intf1_name, remove_only_once=False)
         self.moveLink(node2, node1_other, intf2_name, intf1_name_other)
         self.moveLink(node1, node2_other, intf1_name, intf2_name_other)
-
-

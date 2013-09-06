@@ -8,7 +8,7 @@ class CMSBot (ChannelBot):
     print "CMBot msg: ", event.msg
     if event.msg.get("CHANNEL",'CMS'):
     #TODO: Here we could get the useful information and do what we need do here
-      host = event.msg.get("host") 
+      host = event.msg.get("host")
       print "host", host
 
 def launch (nexus = "MessengerNexus"):
@@ -17,4 +17,3 @@ def launch (nexus = "MessengerNexus"):
     CMSBot(real_nexus.get_channel('CMS'))
 
   core.call_when_ready(start, nexus, args=[nexus])
- 

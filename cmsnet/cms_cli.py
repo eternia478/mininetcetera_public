@@ -209,7 +209,7 @@ class CMSCLI( Cmd ):
         if not vm:                   # Ignore NoneType instances
             return False
         if exp_paused is not None:   # exp_paused implies exp_running is True
-            exp_running = True      
+            exp_running = True
 
         if not isinstance(vm, VirtualMachine):
             if isinstance(vm, Hypervisor):
@@ -337,7 +337,7 @@ class CMSCLI( Cmd ):
 
         err1 = self._check_vm_name_available(vm_name)
         err2 = False      # TODO: Check vm_script value and others.
- 
+
         if not err1 and not err2:
             self.cn.createVM(vm_name, **vm_kwargs)
 
@@ -420,7 +420,7 @@ class CMSCLI( Cmd ):
             return
 
         err, vm = self._check_vm_name(vm_name, exp_paused=False)
-        
+
         if not err:
             self.cn.pauseVM(vm)
 
@@ -437,7 +437,7 @@ class CMSCLI( Cmd ):
             return
 
         err, vm = self._check_vm_name(vm_name, exp_paused=True)
-        
+
         if not err:
             self.cn.resumeVM(vm)
 
@@ -471,7 +471,7 @@ class CMSCLI( Cmd ):
             return
 
         err, vm = self._check_vm_name(vm_name)
-        
+
         if not err:
             self.cn.deleteVM(vm)
 
@@ -517,7 +517,7 @@ class CMSCLI( Cmd ):
             if self.cn.vm_dist_mode == "cycle":
                 hv_cycle_names = [hv.name for hv in self.cn.hv_cycle]
                 out_str += "\thv_cycle: %s" % hv_cycle_names
-        
+
         output(out_str+"\n")
 
     def do_mode( self, line, cmd_name='mode' ):

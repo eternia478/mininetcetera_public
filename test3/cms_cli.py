@@ -265,7 +265,7 @@ class CMSCLI( Cmd ):
             return
 
         err = self._check_vm_name(vm_name, exp_exist=False, exp_running=None)
-        
+
         if not err:
             self.cn.createVM(vm_name)
 
@@ -321,7 +321,7 @@ class CMSCLI( Cmd ):
             return
 
         err = self._check_vm_name(vm_name, exp_exist=True, exp_running=True)
-        
+
         if not err:
             self.cn.stopVM(vm_name)
 
@@ -337,7 +337,7 @@ class CMSCLI( Cmd ):
             return
 
         err = self._check_vm_name(vm_name, exp_exist=True, exp_running=False)
-        
+
         if not err:
             self.cn.deleteVM(vm_name)
 

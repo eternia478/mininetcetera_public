@@ -33,4 +33,3 @@ class CLITest (CMSAPI):
 
 if __name__ == '__main__':
     CLITest()
-

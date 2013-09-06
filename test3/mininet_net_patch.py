@@ -19,7 +19,7 @@ class MininetPatch(object):
                      info( dummy.name + ' ' )
                      dummy.terminate()
           And make the following changes in this class:
-           - Remove above patch importing and import the real POXNormalSwitch
+            Remove above patch importing and import the real POXNormalSwitch
            - Remove the call to self._tempStartDummy() in start():
            - Remove the call to self._tempStopDummy() in stop():
            - Edit all self._moveLink and whatnot to self.mn.moveLink()
@@ -31,7 +31,7 @@ class MininetPatch(object):
     def addDummy( self, name='dummy', cls=Dummy, **params ):
         """
         Add dummy.
-        
+
         dummy: Dummy class
         """
         if not cls:
@@ -81,7 +81,7 @@ class MininetPatch(object):
         self.addLink( host, dummy, hostPort, dummyPort )
 
         # if ( self.inNamespace ):
-        #     self.configureControlNetwork()        
+        #     self.configureControlNetwork()
         if ( self.inNamespace ):
             self.configureControlNetwork()
 
@@ -92,7 +92,7 @@ class MininetPatch(object):
         if intf:
             host.configDefault()
         else:       # Don't configure nonexistent intf
-            host.configDefault( ip=None, mac=None ) 
+            host.configDefault( ip=None, mac=None )
         host.cmd( 'ifconfig lo up' )
 
         # if self.xterms:
@@ -114,7 +114,7 @@ class MininetPatch(object):
 
         # self.built = True
         self.built = True
-        
+
         return host
 
     def moveLink( self, node1, node2, intf1_name=None, intf2_name=None ):
@@ -160,7 +160,7 @@ class MininetPatch(object):
 
         # Part 1.5: Call detach() on switch.
         if hasattr(node1_other, 'detach'):
-            if self.debug_flag1: 
+            if self.debug_flag1:
                 print "Detach %s from %s" % (intf1_other, node1_other)
             node1_other.detach(intf1_other)
 
@@ -283,5 +283,3 @@ class MininetPatch(object):
         self.removeLink(node1, intf1_name, remove_only_once=False)
         self.moveLink(node2, node1_other, intf2_name, intf1_name_other)
         self.moveLink(node1, node2_other, intf1_name, intf2_name_other)
-
-

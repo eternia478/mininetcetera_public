@@ -146,9 +146,9 @@ class VirtualMachine( CMSComponent ):
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
         return self.config_folder+"/"+self.name+".config_vm"
-    
-    
-    
+
+
+
     def check_comp_config( self ):
         "Check for any previous configurations and adjust if necessary."
         # See http://stackoverflow.com/questions/14574518/
@@ -163,7 +163,7 @@ class VirtualMachine( CMSComponent ):
                         setattr(self, attr, str(config[attr]))
                     else:
                         setattr(self, attr, config[attr])
-                f.close()                
+                f.close()
         except IOError as e:
             info("No config exists for VM %s" % self.name)
 
@@ -268,6 +268,3 @@ class Hypervisor( CMSComponent ):
         "Disable the hypervisor from running VMs."
         assert self.is_enabled()
         self._enabled = False
-
-
-

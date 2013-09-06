@@ -19,7 +19,7 @@ class CMSBot (ChannelBot):
       msgcmd = event.msg.get("cmd")
       if msgcmd == msglevel or msglevel == None:
         log.info("migrated")
-  
+
   def _exec_cmd_instantiated (self, event):
     if event.msg.get("CHANNEL",'CMS'):
       print "instantiated"
@@ -27,22 +27,22 @@ class CMSBot (ChannelBot):
       msglevel = event.msg.get("msglevel")
       msgcmd = event.msg.get("cmd")
       if msgcmd == msglevel or msglevel == None:
-        log.info("instantiated")  
-  
+        log.info("instantiated")
+
   def _exec_cmd_destroyed (self, event):
     if event.msg.get("CHANNEL",'CMS'):
-      print "destroyed" 
+      print "destroyed"
       print "CMBot msg: ", event.msg
       msglevel = event.msg.get("msglevel")
       msgcmd = event.msg.get("cmd")
       if msgcmd == msglevel or msglevel == None:
-        log.info("destroyed")  
-  
-  
+        log.info("destroyed")
+
+
   def _unhandled (self, event):
     if event.msg.get("CHANNEL",'CMS'):
-      print "CMBot msg: ", event.msg 
-        
+      print "CMBot msg: ", event.msg
+
 
 def launch (nexus = "MessengerNexus"):
   def start (nexus):
@@ -50,4 +50,3 @@ def launch (nexus = "MessengerNexus"):
     CMSBot(real_nexus.get_channel('CMS'))
 
   core.call_when_ready(start, nexus, args=[nexus])
- 

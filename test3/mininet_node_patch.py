@@ -134,7 +134,7 @@ class POXSwitch( Switch ):
         ps += "\n  listenPort      \t"      + str(self.listenPort)
         if self.print_personal_debug: print ps
         # self._run_pox_switch()
-        
+
     def _build_cmd_args( self ):
         "Build command-line argument of POX."
         self.run_file = ""
@@ -172,10 +172,10 @@ class POXSwitch( Switch ):
         self.command += " " + self.cmd_tail
         if self.print_personal_debug: print "EVAL: " + self.command
         # @GLY
-        
-        
-        
-        
+
+
+
+
     def _run_pox_switch( self ):
         if self.pox_pid is not None:
             warn( "Killing old pox switch to restart new one." )
@@ -200,7 +200,7 @@ class POXSwitch( Switch ):
             print "yyyyyyyyyyyyyyyy"
         self._build_cmd_args()
         self.cmd( self.command, printPid=True )
-        
+
         self.started_switch = True
 
     def _kill_pox_switch( self ):
@@ -289,5 +289,3 @@ class POXNormalSwitch( POXSwitch ):
         params.update({"inNamespace":True})
         POXSwitch.__init__(self, name, control_flag=True,
                            control_type="forwarding.l2_pairs", **params)
-
-

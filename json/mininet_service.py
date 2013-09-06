@@ -78,4 +78,3 @@ def launch (nexus = "MessengerNexus"):
     CMSBot(real_nexus.get_channel('CMS'))
 
   core.call_when_ready(start, nexus, args=[nexus])
-

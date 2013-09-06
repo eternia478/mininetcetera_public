@@ -265,7 +265,7 @@ class CMSCLI( Cmd ):
             return
 
         err = self._check_vm_name(vm_name, exp_exist=False, exp_running=None)
-        
+
         if not err:
             self.cn.createVM(vm_name)
     # @GLY
@@ -309,8 +309,8 @@ class CMSCLI( Cmd ):
         if not err1 and not err2:
             self.cn.cloneVM(vm1_name, vm2_name)
     """
-    
-        
+
+
     def do_launch( self, line ):
         "Initialize the created VM on a hypervisor."
         args = line.split()
@@ -363,7 +363,7 @@ class CMSCLI( Cmd ):
             return
 
         err = self._check_vm_name(vm_name, exp_exist=True, exp_running=True)
-        
+
         if not err:
             self.cn.stopVM(vm_name)
 
@@ -379,11 +379,11 @@ class CMSCLI( Cmd ):
             return
 
         err = self._check_vm_name(vm_name, exp_exist=True, exp_running=False)
-        
+
         if not err:
             self.cn.deleteVM(vm_name)
 
-    
+
 
     def do_mode( self, line ):
         "Change the mode of VM distribution across hypervisors."

@@ -156,7 +156,7 @@ class CMSnet( object ):
 
         self.VMs = []
         self.HVs = []
-        self.nameToComp = {}   # name to CMSComponent (VM/HV) objects 
+        self.nameToComp = {}   # name to CMSComponent (VM/HV) objects
         self.controller_socket = None
 
         self.last_hv = None
@@ -614,7 +614,7 @@ class CMSnet( object ):
 
 
 
-  
+
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
     # CMS VM Distribution Mode Handling
     #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
@@ -771,7 +771,7 @@ class CMSnet( object ):
         if self.debug_flag1:
             print "EXEC: cloneVM(%s, %s):" % (old_vm, new_vm_name)
 
-        if new_vm_name is None:          
+        if new_vm_name is None:
             new_vm_name = old_vm.name
             while new_vm_name in self.nameToComp:
                 new_vm_name += ".cp"
@@ -830,7 +830,7 @@ class CMSnet( object ):
         assert vm in self.VMs
         assert hv in self.HVs
         assert isinstance(vm, VirtualMachine)
-        assert isinstance(hv, Hypervisor) 
+        assert isinstance(hv, Hypervisor)
         assert vm.is_running()
         assert hv.is_enabled()
 
@@ -958,7 +958,7 @@ class CMSnet( object ):
                 self.vm_dist_limit = vm_dist_limit
             if last_hv is not None:
                 assert vm_dist_mode in ["same", "different"]
-                assert isinstance(last_hv, Hypervisor) 
+                assert isinstance(last_hv, Hypervisor)
                 self.last_hv = last_hv
             if hv_cycle is not None:
                 assert vm_dist_mode == "cycle"
@@ -987,9 +987,9 @@ class CMSnet( object ):
         "Change the level of CMS message handling at the controller."
         if self.debug_flag1:
             print "EXEC: changeCMSMsgLevel(%s):" % msg_level
-        
+
         assert msg_level in self.possible_levels
-        
+
         self.msg_level = msg_level
         self.update_net_config()
 
@@ -1051,7 +1051,7 @@ class CMSnet( object ):
             print "EXEC: enableHV(%s):" % hv
 
         assert hv in self.HVs
-        assert isinstance(hv, Hypervisor) 
+        assert isinstance(hv, Hypervisor)
         assert not hv.is_enabled()
 
         hv.enable()
@@ -1062,7 +1062,7 @@ class CMSnet( object ):
             print "EXEC: disableHV(%s):" % hv
 
         assert hv in self.HVs
-        assert isinstance(hv, Hypervisor) 
+        assert isinstance(hv, Hypervisor)
         assert hv.is_enabled()
 
         self.evictVMsFromHV(hv)
@@ -1074,23 +1074,9 @@ class CMSnet( object ):
             print "EXEC: killHV(%s):" % hv
 
         assert hv in self.HVs
-        assert isinstance(hv, Hypervisor) 
+        assert isinstance(hv, Hypervisor)
         assert hv.is_enabled()
 
         for vm in hv.nameToVMs.values():
             self.stopVM(vm)
         hv.disable()
-
-
-
-
-
-
-
-
-
-
-
-
-
-

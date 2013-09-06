@@ -65,5 +65,3 @@
     Mininet itself shuts down. Saved to VM. A bit messy.
   - It would be better to have Mininet itself split it across nodes, but
     only a VM would be removed like this.
-
-

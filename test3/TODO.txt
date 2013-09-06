@@ -24,7 +24,7 @@
 7. [DONE] Rewrite moveLink and such? (default interfaces when None?)
 8. Figure out some stuff for the comp.py [This one is also a big task.]
   - Setting starting and stopping scripts for VMs
-  - Enabling and disabling hypervisors (not complete right now). 
+  - Enabling and disabling hypervisors (not complete right now).
 9. Rewrite comp.py repr functions.
 10. Clean up comments (a lot still refer to Mininet). This one is not important.
 11. Clean up stuff (dummy?)

@@ -12,4 +12,3 @@ mkdir config 2> /dev/null
 cd config
 
 sudo env PYTHONPATH=$PYTHONPATH POX_CORE_DIR=$POX_CORE_DIR $PYTHONPATH/bin/cms $@
-

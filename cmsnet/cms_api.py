@@ -76,7 +76,7 @@ class CMSAPI (object):
     """
     Runs the CLI. CURRENTLY UNUSED.
     """
-    return 
+    return
     self.set_net_topo()
     self.net.start()
     self.set_cms_commands()
@@ -234,7 +234,7 @@ class CMSAPI (object):
     }
     return method_aliases
 
-  
+
 
 
 
@@ -650,7 +650,7 @@ class CMSAPI (object):
     self._check_hv(hv, exp_enabled=True)
 
     self.net.killHV(hv)
-    
+
 
 
 
@@ -792,7 +792,7 @@ class CMSAPI (object):
       - cycleall  = Choose HVs in a cycle from all HVs.
     vm_dist_limit: Limit of number of VMs hypervisors can hold.
                    For "packed" mode only.
-    last_hv: Last used hypervisor (name) as default. 
+    last_hv: Last used hypervisor (name) as default.
              For "same" or "different" mode only.
     cycle_pos: Position of pointer in hypervisor cycle.
                For "cycle" or "cycleall" mode only.
@@ -832,7 +832,7 @@ class CMSAPI (object):
       if cycle_pos <= 0:
         raise CMSNonpositiveValueError('cycle_pos', vm_dist_limit)
       if hv_cycle is not None:
-        # CMSHVCycleIndexError        
+        # CMSHVCycleIndexError
       vm_dist_args["cycle_pos"] = cycle_pos
 
 
@@ -858,12 +858,3 @@ class CMSAPI (object):
     #CMSInvalidChoiceValueError
 
     self.net.changeVMDistributionMode(vm_dist_mode, vm_dist_args)
-
-
-
-
-
-
-
-
-

@@ -399,6 +399,3 @@ class CMSHypervisorEnabledStateError (CMSCompStateError):
       return 'Hypervisor %s is currently enabled.' % hv.name
     else:
       return 'Hypervisor %s is currently disabled.' % hv.name
-
-
-

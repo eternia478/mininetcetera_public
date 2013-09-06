@@ -404,6 +404,3 @@ class Hypervisor( CMSComponent ):
         assert self.is_enabled()
         self._enabled = False
         self.update_comp_config()
-
-
-

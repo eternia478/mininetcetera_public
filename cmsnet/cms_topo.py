@@ -106,6 +106,3 @@ class CMSHubAndSpokeTopo(CMSTopo):
             switch = self.addHVSwitch('s%s' % i)
             # Connect switch to fabric-switch
             self.addLink(switch, fabric)
-
-
-
