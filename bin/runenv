@@ -1,14 +1,32 @@
 #!/bin/bash
 
-PYTHONPATH2=
 PYTHONPATH=/home/mininet/mininet_folder/
 POX_CORE_DIR=/home/mininet/pox_folder/
 CONFIG_FOLDER_LOCATION=.
+RUNFILE=$1
+shift 1
 
-
+if [ ! -f $RUNFILE ]; then
+    if [ -f $RUNFILE.py ]; then
+        RUNFILE=$RUNFILE.py
+    else
+        echo "Run file '$RUNFILE' does not exist."
+        exit 1
+    fi
+fi
+if [ ! -d $CONFIG_FOLDER_LOCATION ]; then
+    if [ -d $PYTHONPATH/$CONFIG_FOLDER_LOCATION ]; then
+        CONFIG_FOLDER_LOCATION=$PYTHONPATH/$CONFIG_FOLDER_LOCATION
+    elif [ -d $HOME/$CONFIG_FOLDER_LOCATION ]; then
+        CONFIG_FOLDER_LOCATION=$HOME/$CONFIG_FOLDER_LOCATION
+    else
+        echo "Directory '$CONFIG_FOLDER_LOCATION' does not exist."
+        exit 1
+    fi
+fi
 
 cd $CONFIG_FOLDER_LOCATION
 mkdir config 2> /dev/null
 cd config
 
-sudo env PYTHONPATH=$PYTHONPATH POX_CORE_DIR=$POX_CORE_DIR $PYTHONPATH/cmstest.py $@
+sudo env PYTHONPATH=$PYTHONPATH POX_CORE_DIR=$POX_CORE_DIR $RUNFILE $@
