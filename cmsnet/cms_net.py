@@ -121,7 +121,7 @@ import cmsnet.mininet_net_patch
 
 
 # Mininet version: should be consistent with README and LICENSE
-VERSION = "2.0.0.i.x.beta"
+VERSION = "2.1.0.i.x.beta"
 
 class CMSnet( object ):
     "Network emulation with hosts spawned in network namespaces."
@@ -192,13 +192,12 @@ class CMSnet( object ):
         return self.getCompByName( *args )
 
     # Even more convenient syntax for node lookup and iteration
-    def __getitem__( self, *args ):
+    def __getitem__( self, key ):
         """net [ name ] operator: Return component(s) with given name(s)"""
-        return self.getCompByName( *args )
+        return self.nameToComp[ key ]
 
     def __iter__( self ):
-        "return iterator over components"
-        #or dow we want to iterate of the keys i.e. comp.name like a dict
+        "return iterator over component names"
         for comp in chain( self.VMs, self.HVs ):
             yield comp.name
 
@@ -208,15 +207,15 @@ class CMSnet( object ):
 
     def __contains__( self, item ):
         "returns True if net contains named component"
-        return item in self.keys()
+        return item in self.nameToComp
 
     def keys( self ):
         "return a list of all component names or net's keys"
-        return list( self.__iter__() )
+        return list( self )
 
     def values( self ):
         "return a list of all components or net's values"
-        return [ self[name] for name in self.__iter__() ]
+        return [ self[name] for name in self ]
 
     def items( self ):
         "return (key,value) tuple list for every component in net"

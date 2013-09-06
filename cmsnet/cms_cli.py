@@ -1028,14 +1028,13 @@ class CMSCLI( Cmd ):
         automatically replaced with corresponding node IP addrs."""
 
         first, args, line = self.parseline( line )
-        if not args:
-            return
-        if args and len(args) > 0 and args[ -1 ] == '\n':
-            args = args[ :-1 ]
-        rest = args.split( ' ' )
 
         if first in self.cn:
+            if not args:
+                print "*** Enter a command for component: %s <cmd>" % first
+                return
             comp = self.cn[ first ]
+            rest = args.split( ' ' )
             # Substitute IP addresses for node names in command
             rest = [ self.cn[ arg ].node.defaultIntf().updateIP()
                      if arg in self.cn else arg
@@ -1046,7 +1045,7 @@ class CMSCLI( Cmd ):
             comp.node.sendCmd( rest, printPid=( not builtin ) )
             self.waitForNode( comp.node )
         else:
-            error( '*** Unknown command: %s\n' % first )
+            error( '*** Unknown command: %s\n' % line )
 
     # pylint: enable-msg=R0201
 
