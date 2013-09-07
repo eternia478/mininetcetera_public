@@ -805,14 +805,13 @@ class CMSnet( object ):
             print "EXEC: createVM(%s, %s, %s, %s):" % args
 
         assert vm_name not in self.nameToComp
+        assert not vm_script or vm_script in self.possible_scripts
         assert not vm_cls or issubclass(vm_cls, VirtualMachine)
-
-        # TODO: Handle vm_script (assert and passing in).
 
         host, host_terms = self.mn.createHostAtDummy(vm_name, **params)
         if not vm_cls:
             vm_cls = self.vm_cls
-        vm = vm_cls(host, self.cmsnet_info)
+        vm = vm_cls(host, vm_script, self.cmsnet_info)
         vm.terms = host_terms
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm

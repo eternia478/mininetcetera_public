@@ -172,7 +172,7 @@ class VirtualMachine( CMSComponent ):
 
     vm_uuid = 0  # UNUSED: For ID purposes? Maybe name is enough.
 
-    def __init__( self, node, cmsnet_info={}, tenant_id=1 ):
+    def __init__( self, node, vm_script=None, cmsnet_info={}, tenant_id=1 ):
         """
         Intialization
 
@@ -182,13 +182,11 @@ class VirtualMachine( CMSComponent ):
         assert isinstance(node, Host)
         CMSComponent.__init__( self, node, cmsnet_info )
 
+        self._vm_script = vm_script
+        self._vm_script_params = ConfigUpdatingDict(self)
         self._tenant_id = tenant_id
         self._hv = None
         self._is_paused = False
-        self.start_script = ""   # CHECK: Should these be modifiable?
-        self.pause_script = ""
-        self.resume_script = ""
-        self.stop_script = ""
 
         self.config_hv_name = None   # temp holder for HV name in config
         self.config_is_paused = None # temp holder for paused status in config
@@ -205,6 +203,32 @@ class VirtualMachine( CMSComponent ):
         if self._hv:
             del self._hv.nameToVMs[old_name]
             self._hv.nameToVMs[self.name] = self
+
+    @property
+    def vm_script( self ):
+        return self._vm_script
+
+    @vm_script.setter
+    def vm_script( self, vm_script ):
+        if vm_script:
+            if not vm_script in self._cmsnet_info["possible_scripts"]:
+                error("No such script: %s.\n" % vm_script)
+                return
+        self._vm_script = vm_script
+        self.update_comp_config()
+
+    @property
+    def vm_script_params( self ):
+        return self._vm_script_params
+
+    @vm_script_params.setter
+    def vm_script_params( self, vm_script_params ):
+        self._vm_script_params = ConfigUpdatingDict(self, vm_script_params)
+        self.update_comp_config()
+
+    @property
+    def tenant_id( self ):
+        return self._tenant_id
 
     @property
     def IP( self ):
@@ -246,10 +270,6 @@ class VirtualMachine( CMSComponent ):
             return self.hv.name
         return None
 
-    @property
-    def tenant_id( self ):
-        return self._tenant_id
-
     def __repr__( self ):
         "More informative string representation"
         # TODO: This should be different.
@@ -260,19 +280,17 @@ class VirtualMachine( CMSComponent ):
         if not self.config_folder:
             return "./"+self.name+".config_vm"
         else:
-            return self._config_folder+"/"+self.name+".config_vm"
+            return self.config_folder+"/"+self.name+".config_vm"
 
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."
+        config["vm_script"] = self.vm_script
+        config["vm_script_params"] = self.vm_script_params
         config["_tenant_id"] = self._tenant_id
         config["IP"] = self.IP
         config["MAC"] = self.MAC
         config["config_hv_name"] = self.hv_name
         config["config_is_paused"] = self.is_paused()
-        config["start_script"] = self.start_script
-        config["pause_script"] = self.pause_script
-        config["resume_script"] = self.resume_script
-        config["stop_script"] = self.stop_script
 
     def is_running( self ):
         "Test if this VM image is running (or inactive) on any hypervisor."
@@ -282,15 +300,47 @@ class VirtualMachine( CMSComponent ):
         "Test if this VM image is paused (or running) on any hypervisor."
         return self.is_running() and self._is_paused
 
+    def get_vm_script_cmd( self, script_type="start" ):
+        "Get the bash command to call the VM script with."
+        if not self.vm_script:
+            return ""
+        assert script_type in ["start", "pause", "resume", "stop"]
+        script_folder = self.cmsnet_info.get("script_folder")
+        if not script_folder:
+            script_folder = "."
+        return "/".join([script_folder, self.vm_script, script_type])
+
+    def get_vm_script_params( self ):
+        "Get the parameters to run the VM script with."
+        default_params = { 'NAME': self.name,
+                           'IP': self.IP(),
+                           'SERVER_IP': '127.0.0.1' }
+        default_params.update(self.vm_script_params)
+        return default_params
+
+    def run_vm_script( self, script_type="start" ):
+        "Run the VM script with preset parameters."
+        if not self.vm_script:
+            return
+        cmd = self.get_vm_script_cmd(script_type=script_type)
+        args = ""
+        known_params = ['NAME', 'IP', 'SERVER_IP']
+        for param in known_params:
+            args += " {param}={{{param}}}".format(param=param)
+        for param in self.vm_script_params:
+            if param not in known_params:
+                args += " {param}={{{param}}}".format(param=param)
+        self.node.cmd(cmd, args.format(**self.get_vm_script_params()))
+
     def cloneTo( self, new_vm ):
         "Clone information from this VM to the new VM image."
         assert new_vm is not None
         assert isinstance(new_vm, VirtualMachine)
         assert not new_vm.is_running()
-        new_vm.start_script = self.start_script
-        new_vm.stop_script = self.stop_script
-        new_vm._tenant_id = self.tenant_id
-        # FIXME: Copy script image files in file system.
+        # Copied here to override any config loading
+        new_vm.vm_script = self.vm_script
+        new_vm.vm_script_params = self.vm_script_params
+        new_vm._tenant_id = self._tenant_id
 
     def launchOn( self, hv ):
         "Initialize the VM on the input hypervisor."
@@ -298,7 +348,7 @@ class VirtualMachine( CMSComponent ):
         assert hv is not None
         assert hv.is_enabled()
         self.hv = hv
-        self.node.cmd(self.start_script)
+        self.run_vm_script(script_type="start")
 
     def moveTo( self, hv ):
         "Migrate the VM to the new input hypervisor."
@@ -313,7 +363,7 @@ class VirtualMachine( CMSComponent ):
         assert not self.is_paused()
         self._is_paused = True
         self.update_comp_config()
-        self.node.cmd(self.pause_script)
+        self.run_vm_script(script_type="pause")
 
     def resume( self ):
         "Resume the VM."
@@ -321,13 +371,13 @@ class VirtualMachine( CMSComponent ):
         assert self.is_paused()
         self._is_paused = False
         self.update_comp_config()
-        self.node.cmd(self.resume_script)
+        self.run_vm_script(script_type="resume")
 
     def stop( self ):
         "Stop running the VM."
         assert self.is_running()
         self.hv = None
-        self.node.cmd(self.stop_script)
+        self.run_vm_script(script_type="stop")
 
     def remove( self ):
         "Remove traces of the VM from existence."
@@ -392,7 +442,7 @@ class Hypervisor( CMSComponent ):
         if not self.config_folder:
             return "./"+self.name+".config_hv"
         else:
-            return self._config_folder+"/"+self.name+".config_hv"
+            return self.config_folder+"/"+self.name+".config_hv"
 
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."
@@ -408,7 +458,7 @@ class Hypervisor( CMSComponent ):
         if self.vm_dist_limit:
             return self.get_num_VMs() >= self.vm_dist_limit
         else:
-            net_vm_dist_limit = self.cmsnet_info.get("vm_dist_limit")
+            net_vm_dist_limit = self._cmsnet_info.get("vm_dist_limit")
             if net_vm_dist_limit:
                 return self.get_num_VMs() >= net_vm_dist_limit
             else:
@@ -429,3 +479,32 @@ class Hypervisor( CMSComponent ):
         assert self.is_enabled()
         self._enabled = False
         self.update_comp_config()
+
+
+class ConfigUpdatingDict(dict):
+    def __init__(self, vm, *args, **kwargs):
+        self.vm = None
+        self.update(*args, **kwargs)
+        assert isinstance(vm, CMSComponent)
+        self.vm = vm
+
+    def __setitem__(self, key, value):
+        super(ConfigUpdatingDict, self).__setitem__(key, value)
+        if self.vm:
+            self.vm.update_comp_config()
+
+    def update(self, *args, **kwargs):
+        if args:
+            if len(args) > 1:
+                raise TypeError("update expected at most 1 arguments, "
+                                "got %d" % len(args))
+            other = dict(args[0])
+            for key in other:
+                self[key] = other[key]
+        for key in kwargs:
+            self[key] = kwargs[key]
+
+    def setdefault(self, key, value=None):
+        if key not in self:
+            self[key] = value
+        return self[key]
