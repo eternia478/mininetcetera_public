@@ -445,7 +445,7 @@ class CMSnet( object ):
         for node_name in self.mn.nameToNode:
             node = self.mn.nameToNode[node_name]
             if node.params.get("cms_type") == "hypervisor":
-                hv = self.hv_cls( node, self.config_folder)
+                hv = self.hv_cls(node, self.cmsnet_info)
                 self.HVs.append(hv)
                 self.nameToComp[ node_name ] = hv
                 # If hv still needs config resuming:
@@ -818,7 +818,7 @@ class CMSnet( object ):
         host, host_terms = self.mn.createHostAtDummy(vm_name, **params)
         if not vm_cls:
             vm_cls = self.vm_cls
-        vm = vm_cls(host, self.config_folder)
+        vm = vm_cls(host, self.cmsnet_info)
         vm.terms = host_terms
         self.VMs.append(vm)
         self.nameToComp[ vm_name ] = vm

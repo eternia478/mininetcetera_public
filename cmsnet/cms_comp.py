@@ -37,17 +37,17 @@ class CMSComponent( object ):
     """A component of the cloud network. This is simply a wrapper for Node
        objects in Mininet."""
 
-    def __init__( self, node, config_folder="." ):
+    def __init__( self, node, cmsnet_info={} ):
         """
         Intialization
 
         node: Mininet node
-        config_folder: Folder containing configuration file
+        cmsnet_info: Dictionary of necessary information from CMSnet
         """
         assert isinstance(node, Node)
-        assert isinstance(config_folder, basestring)
+        assert isinstance(cmsnet_info, dict)
         self._node = node
-        self._config_folder = config_folder
+        self._cmsnet_info = cmsnet_info
         self._allow_write_comp_config = True
 
     @property
@@ -67,6 +67,10 @@ class CMSComponent( object ):
         self.node.name = name
         self.update_comp_config()
 
+    @property
+    def config_folder( self ):
+        return self._cmsnet_info.get("config_folder")
+
     def __repr__( self ):
         "More informative string representation"
         # NOTE: This should be overridden.
@@ -79,7 +83,10 @@ class CMSComponent( object ):
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
         # NOTE: This should be overridden.
-        return self._config_folder+"/"+self.name+".config_cmscomp"
+        if not self.config_folder:
+            return "./"+self.name+".config_cmscomp"
+        else:
+            return self.config_folder+"/"+self.name+".config_cmscomp"
 
     def lock_comp_config( self ):
         "Lock the configuration file to prevent it from being written."
@@ -165,15 +172,15 @@ class VirtualMachine( CMSComponent ):
 
     vm_uuid = 0  # UNUSED: For ID purposes? Maybe name is enough.
 
-    def __init__( self, node, config_folder=".", tenant_id=1 ):
+    def __init__( self, node, cmsnet_info={}, tenant_id=1 ):
         """
         Intialization
 
         node: Mininet node
-        config_folder: Folder containing configuration file
+        cmsnet_info: Dictionary of necessary information from CMSnet
         """
         assert isinstance(node, Host)
-        CMSComponent.__init__( self, node, config_folder )
+        CMSComponent.__init__( self, node, cmsnet_info )
 
         self._tenant_id = tenant_id
         self._hv = None
@@ -250,7 +257,10 @@ class VirtualMachine( CMSComponent ):
 
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
-        return self._config_folder+"/"+self.name+".config_vm"
+        if not self.config_folder:
+            return "./"+self.name+".config_vm"
+        else:
+            return self._config_folder+"/"+self.name+".config_vm"
 
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."
@@ -338,15 +348,15 @@ class Hypervisor( CMSComponent ):
     """A hypervisor that virtual machines run on. A wrapper class for the
        Switch class."""
 
-    def __init__( self, node, config_folder=".", vm_dist_limit=None):
+    def __init__( self, node, cmsnet_info={}, vm_dist_limit=None ):
         """
         Intialization
 
         node: Mininet node
-        config_folder: Folder containing configuration file
+        cmsnet_info: Dictionary of necessary information from CMSnet
         """
         assert isinstance(node, Switch)
-        CMSComponent.__init__( self, node, config_folder )
+        CMSComponent.__init__( self, node, cmsnet_info )
 
         self.nameToVMs = {}   # UNUSED: mapping for VMs in this hypervisor
         self._enabled = True
@@ -378,7 +388,10 @@ class Hypervisor( CMSComponent ):
 
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
-        return self._config_folder+"/"+self.name+".config_hv"
+        if not self.config_folder:
+            return "./"+self.name+".config_hv"
+        else:
+            return self._config_folder+"/"+self.name+".config_hv"
 
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."
