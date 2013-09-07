@@ -702,12 +702,6 @@ class CMSnet( object ):
         hv = vm_dist_handler(old_hv=old_hv)
         return hv
 
-    def isHVFull( self, hv ):
-        "Check if hypervisor has reached its VM capacity limit (packed mode)."
-        hv_limit = hv.vm_dist_limit
-        limit = hv_limit if hv_limit else self.vm_dist_limit
-        return hv.get_num_VMs() >= limit
-
     def _vm_dist_random( self, old_hv=None ):
         "Choose a random HV."
         hv_list = [hv for hv in self.HVs if hv is not old_hv]
@@ -723,7 +717,7 @@ class CMSnet( object ):
     def _vm_dist_packed( self, old_hv=None ):
         "Choose HVs so that VMs are packed together."
         hv_list = [hv for hv in self.HVs if hv is not old_hv]
-        avail_hvs = [hv for hv in hv_list if not self.isHVFull(hv)]
+        avail_hvs = [hv for hv in hv_list if not hv.is_full()]
         if len(avail_hvs) == 0:
             error_msg = "No hypervisor is available."
             error("\nCannot get HV: %s\n" % error_msg)

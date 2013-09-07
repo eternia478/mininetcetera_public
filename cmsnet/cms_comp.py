@@ -354,6 +354,7 @@ class Hypervisor( CMSComponent ):
 
         node: Mininet node
         cmsnet_info: Dictionary of necessary information from CMSnet
+        vm_dist_limit: Hypervisor's personal VM capacity limit
         """
         assert isinstance(node, Switch)
         CMSComponent.__init__( self, node, cmsnet_info )
@@ -401,6 +402,17 @@ class Hypervisor( CMSComponent ):
     def get_num_VMs( self ):
         "Return the number of VMs running on this hypervisor."
         return len(self.nameToVMs)
+
+    def is_full( self ):
+        "Check if this hypervisor has reached its VM capacity limit."
+        if self.vm_dist_limit:
+            return self.get_num_VMs() >= self.vm_dist_limit
+        else:
+            net_vm_dist_limit = self.cmsnet_info.get("vm_dist_limit")
+            if net_vm_dist_limit:
+                return self.get_num_VMs() >= net_vm_dist_limit
+            else:
+                return False
 
     def is_enabled( self ):
         "Test if this hypervisor is enabled to run VMs or not."
