@@ -37,6 +37,7 @@ from mininet.util import quietRun, isShellBuiltin, dumpNodeConnections
 from mininet.util import checkInt, splitArgs
 
 from cmsnet.cms_comp import VirtualMachine, Hypervisor
+import cmsnet.cms_comp
 import re
 
 class CMSCLI( Cmd ):
@@ -197,6 +198,32 @@ class CMSCLI( Cmd ):
 
         return False
 
+    def _check_vm_kwargs( self, vm_kwargs={} ):
+        """
+        Check the extra parameters for a new VM.
+
+        vm_kwargs may contain:
+            vm_script: Name of script for VM to run.
+            vm_cls: Class of VM object. If a name string, set to Python class.
+            params: Other paramters for underlying Host object.
+        """
+        vm_script = vm_kwargs.get("vm_script")
+        vm_cls = vm_kwargs.get("vm_cls")
+        err = True
+
+        if vm_script:
+            if vm_script not in self.cn.possible_scripts:
+                error("No such script: %s.\n" % vm_script)
+                err = True
+        if vm_cls:
+            if isinstance(vm_cls, basestring):
+                vm_cls = getattr(cmsnet.cms_comp, vm_cls, None)
+                vm_kwargs["vm_cls"] = vm_cls
+            if not issubclass(vm_cls, VirtualMachine):
+                error("VM class not valid: %s.\n" % vm_cls)
+                err = True
+        return err
+
     def _check_vm( self, vm, exp_running=None, exp_paused=None ):
         """
         Check conditions for an existing VM.
@@ -278,7 +305,6 @@ class CMSCLI( Cmd ):
         er = self._check_vm(vm, exp_running=exp_running, exp_paused=exp_paused)
         return er, vm
 
-
     def _check_hv_name( self, name, exp_enabled=None ):
         if not name:                 # Ignore if not set by input.
             return False, None       # NOTE: Already handled at parsing.
@@ -336,7 +362,7 @@ class CMSCLI( Cmd ):
             return
 
         err1 = self._check_vm_name_available(vm_name)
-        err2 = False      # TODO: Check vm_script value and others.
+        err2 = self._check_vm_kwargs(vm_kwargs)
 
         if not err1 and not err2:
             self.cn.createVM(vm_name, **vm_kwargs)
@@ -835,7 +861,7 @@ class CMSCLI( Cmd ):
         for vm_name in vm_info:
             vm_kwargs = vm_info[vm_name]
             err1 = self._check_vm_name_available(vm_name)
-            err2 = False      # TODO: Check vm_script value and others.
+            err2 = self._check_vm_kwargs(vm_kwargs)
             if not err1 and not err2:
                 self.cn.createVM(vm_name, **vm_kwargs)
 

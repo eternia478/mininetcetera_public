@@ -16,6 +16,7 @@ from mininet.log import info, output, error
 from mininet.term import makeTerms, runX11
 from cmsnet.cms_net import CMSnet
 from cmsnet.cms_comp import CMSComponent, VirtualMachine, Hypervisor
+import cmsnet.cms_comp
 from cmsnet.cms_exc import ( CMSCompNameError, CMSVMNameError,
                                CMSHypervisorNameError,
                                CMSTypeError, CMSCompTypeError,
@@ -286,6 +287,20 @@ class CMSAPI (object):
     elif vm_name in self.get_method_aliases():
       raise CMSNameReservedForMethodError(vm_name)
 
+  def _get_vm_cls (self, vm_cls_input):
+    """
+    Get the intended VM class.
+
+    vm_cls_input: Input information to obtain VM class (name or class itself).
+    Returns VM class represented by input.
+    """
+    vm_cls = vm_cls_input
+    if isinstance(vm_cls_input, basestring):
+      vm_cls = getattr(cmsnet.cms_comp, vm_cls_input, None)
+      if not vm_cls:
+        raise CMSCompClassNameError(vm_cls_input)
+    return vm_cls
+
   def _check_vm (self, vm, exp_running=None, exp_paused=None):
     """
     Check conditions for an existing VM.
@@ -328,15 +343,16 @@ class CMSAPI (object):
     comp_input: Input info on CMS component (its name or component itself).
     Returns CMS component represented by input.
     """
+    comp = comp_input
     if isinstance(comp_input, basestring):
       if comp_input not in self.net:
         raise CMSCompNameError(comp_input)
-      comp_input = self.net[comp_input]
+      comp = self.net[comp_input]
 
-    if isinstance(comp_input, CMSComponent):
-      return comp_input
+    if isinstance(comp, CMSComponent):
+      return comp
     else:
-      raise CMSCompTypeError(comp_input)
+      raise CMSCompTypeError(comp)
 
   def _get_vm (self, vm_input):
     """
@@ -345,15 +361,16 @@ class CMSAPI (object):
     vm_input: Input information to obtain VM. May be its name or VM itself.
     Returns VM represented by input.
     """
+    vm = vm_input
     if isinstance(vm_input, basestring):
       if vm_input not in self.net:
         raise CMSVMNameError(vm_input)
-      vm_input = self.net[vm_input]
+      vm = self.net[vm_input]
 
-    if isinstance(vm_input, VirtualMachine):
-      return vm_input
+    if isinstance(vm, VirtualMachine):
+      return vm
     else:
-      raise CMSCompTypeError(vm_input)
+      raise CMSCompTypeError(vm)
 
   def _get_hv (self, hv_input):
     """
@@ -362,15 +379,16 @@ class CMSAPI (object):
     vm_input: Input information to obtain HV. May be its name or HV itself.
     Returns HV represented by input.
     """
+    hv = hv_input
     if isinstance(hv_input, basestring):
       if hv_input not in self.net:
         raise CMSHypervisorNameError(hv_input)
-      hv_input = self.net[hv_input]
+      hv = self.net[hv_input]
 
-    if isinstance(hv_input, Hypervisor):
-      return hv_input
+    if isinstance(hv, Hypervisor):
+      return hv
     else:
-      raise CMSCompTypeError(hv_input)
+      raise CMSCompTypeError(hv)
 
 
 
@@ -395,6 +413,8 @@ class CMSAPI (object):
     params: Parameters for the underlying node.
     Returns a newly created VM instance. None if errored.
     """
+    vm_cls = self._get_vm_cls(vm_cls)
+
     if not isinstance(vm_name, basestring):
       raise CMSTypeError('vm_name must be a string')
     if vm_script is not None and not isinstance(vm_script, basestring):
@@ -403,7 +423,8 @@ class CMSAPI (object):
       raise CMSTypeError('vm_cls must be None or a subclass of VirtualMachine')
 
     self._check_vm_name_available(vm_name)
-    # TODO: Check script
+    if vm_script and vm_script not in self.cn.possible_scripts:
+      raise CMSInvalidChoiceValueError('vm_script', vm_script)
 
     vm = self.net.createVM(vm_name, vm_script, vm_cls, **params)
     self.local_vars[vm_name] = vm

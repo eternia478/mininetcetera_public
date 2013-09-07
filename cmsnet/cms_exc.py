@@ -44,27 +44,43 @@ class CMSBaseException (Exception):
 
 
 
-class CMSCompNameError (CMSBaseException):
+class CMSNameError (CMSBaseException):
   """
-  Component name not found in CMSnet.
+  Name not found in CMSnet.
   """
   def __init__ (self, name, message=None):
     """
     Initialization
 
-    name: Name of relavant CMS component.
+    name: Name of non-existent item.
     message: Message of exception. None if default.
     """
     if message is None:
       message = self.get_message(name)
-    super(CMSCompNameError, self).__init__(message)
+    super(CMSNameError, self).__init__(message)
 
   def get_message (self, name):
     """
     Generate error message.
 
-    name: Name of relavant CMS component.
+    name: Name of non-existent item.
     """
+    return 'No such CMS item %s.' % name
+
+
+class CMSCompClassNameError (CMSNameError):
+  """
+  Component class name not found in CMSnet.
+  """
+  def get_message (self, name):
+    return 'No such CMS component class %s.' % name
+
+
+class CMSCompNameError (CMSNameError):
+  """
+  Component name not found in CMSnet.
+  """
+  def get_message (self, name):
     return 'No such CMS component %s.' % name
 
 
