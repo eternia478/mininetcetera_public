@@ -1,0 +1,12 @@
+#!/bin/bash
+
+NAME=$1
+SERVER_IP=$2
+if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
+
+cd /tmp/$NAME
+
+mkdir client 2> /dev/null
+cd client
+wget --no-host-directories --tries=10 $SERVER_IP:8000/file.txt

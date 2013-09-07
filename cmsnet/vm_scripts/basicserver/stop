@@ -1,0 +1,16 @@
+#!/bin/bash
+
+NAME=$1
+if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+
+cd /tmp/$NAME
+
+cd server
+rm file.txt 2> /dev/null
+cd ..
+rmdir server 2> /dev/null
+
+kill `cat /tmp/$NAME/pid` 2> /dev/null
+sleep 1
+kill -9 `cat /tmp/$NAME/pid` 2> /dev/null
+rm /tmp/$NAME/pid 2> /dev/null

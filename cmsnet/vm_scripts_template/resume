@@ -1,0 +1,13 @@
+#!/bin/bash
+
+NAME=$1
+SERVER_IP=$2
+if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
+
+cd /tmp/$NAME
+
+cd folder_name
+echo "Resume."
+
+echo $! > /tmp/$NAME/pid

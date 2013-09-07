@@ -1,0 +1,13 @@
+#!/bin/bash
+
+NAME=$1
+if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+
+cd /tmp/$NAME
+
+mkdir server 2> /dev/null
+cd server
+echo "This is a basic file by $NAME." > file.txt
+python -m SimpleHTTPServer &
+
+echo $! > /tmp/$NAME/pid
