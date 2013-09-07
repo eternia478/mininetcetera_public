@@ -143,6 +143,9 @@ class CMSnet( object ):
            controller_ip = IP to connect to for the controller socket.
            controller_port = Port to connect to for the controller socket.
            params: extra paramters for Mininet"""
+        self._allow_write_net_config = False
+        self.cmsnet_info = {}
+
         self.new_config = new_config
         self.config_folder = config_folder
         self.script_folder = script_folder
@@ -222,6 +225,50 @@ class CMSnet( object ):
     def items( self ):
         "return (key,value) tuple list for every component in net"
         return zip( self.keys(), self.values() )
+
+
+
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+    # CMS Net Special Attribute Handlers
+    #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
+
+    @property
+    def config_folder( self ):
+        return self.cmsnet_info.get("config_folder")
+
+    @config_folder.setter
+    def config_folder( self, config_folder ):
+        self.cmsnet_info["config_folder"] = config_folder
+        self.update_net_config()
+        if not self.is_net_config_locked():
+            for comp in self.nameToComp.values():
+                comp.update_comp_config()
+
+    @property
+    def script_folder( self ):
+        return self.cmsnet_info.get("script_folder")
+
+    @script_folder.setter
+    def script_folder( self, script_folder ):
+        self.cmsnet_info["script_folder"] = script_folder
+        self.update_net_config()
+
+    @property
+    def vm_dist_limit( self ):
+        return self.cmsnet_info.get("vm_dist_limit")
+
+    @vm_dist_limit.setter
+    def vm_dist_limit( self, vm_dist_limit ):
+        self.cmsnet_info["vm_dist_limit"] = vm_dist_limit
+        self.update_net_config()
+
+    @property
+    def possible_scripts( self ):
+        return self.cmsnet_info.get("possible_scripts")
+
+    @possible_scripts.setter
+    def possible_scripts( self, possible_scripts ):
+        self.cmsnet_info["possible_scripts"] = possible_scripts
 
 
 
