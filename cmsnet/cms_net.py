@@ -126,13 +126,14 @@ VERSION = "2.1.0.i.x.beta"
 class CMSnet( object ):
     "Network emulation with hosts spawned in network namespaces."
 
-    def __init__( self, new_config=False, config_folder=".",
+    def __init__( self, new_config=False, config_folder=".", script_folder="",
                   vm_dist_mode="random", vm_dist_limit=10, msg_level="all",
                   net_cls=Mininet, vm_cls=VirtualMachine, hv_cls=Hypervisor,
                   controller_ip="127.0.0.1", controller_port=7790, **params):
         """Create Mininet object.
            new_config: True if we are using brand new configurations.
            config_folder: Folder where configuration files are saved/loaded.
+           script_folder: Folder where script files are run from.
            vm_dist_mode: Mode of how VMs are distributed amongst hypervisors
            vm_dist_limit: Limit of number of VMs on hypervisors in packed mode
            msg_level: CMS message handling level at controller
@@ -144,6 +145,7 @@ class CMSnet( object ):
            params: extra paramters for Mininet"""
         self.new_config = new_config
         self.config_folder = config_folder
+        self.script_folder = script_folder
         self.vm_dist_mode = vm_dist_mode
         self.vm_dist_limit = vm_dist_limit
         self.msg_level = msg_level
@@ -159,13 +161,13 @@ class CMSnet( object ):
         self.nameToComp = {}   # name to CMSComponent (VM/HV) objects
         self.controller_socket = None
 
-        self.last_hv = None
-        self.hv_cycle = []
-        self.cycle_pos = -1
-
         self.possible_modes = CMSnet.getPossibleVMDistModes()
         self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
         self.possible_scripts = CMSnet.getPossibleVMScripts()
+
+        self.last_hv = None
+        self.hv_cycle = []
+        self.cycle_pos = -1
 
         # Config placeholders. To make the python interp happy.
         self._last_hv_name = None
@@ -571,7 +573,18 @@ class CMSnet( object ):
     @classmethod
     def getPossibleVMScripts( cls ):
         "Dynamically obtain all possible scripts for VMs to run."
-        return ["pizza"]   # TODO: Implement me!
+        if self.script_folder and os.path.isdir(self.script_folder):
+            return os.listdir(self.script_folder)
+
+        for pypath in sys.path[0]:
+            if not pypath: pypath = "."
+            script_folder = pypath+"/cmsnet/vm_scripts"
+            if os.path.isdir(script_folder):
+                self.script_folder = script_folder
+                return os.listdir(self.script_folder)
+
+        error("\nCannot establish scripts folder.\n")
+        return []
 
 
 
