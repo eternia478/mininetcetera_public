@@ -2,5 +2,6 @@
 
 NAME=$1
 if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+if [ ! -d /tmp/$NAME ]; then echo "No such directory /tmp/$NAME."; exit 1; fi
 
 echo "Start." >> /tmp/$NAME/state.txt

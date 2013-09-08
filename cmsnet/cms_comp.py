@@ -29,6 +29,7 @@ from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
 
 from cmsnet.cms_log import config_error
+import shutil
 import json
 defaultDecoder = json.JSONDecoder()
 
@@ -79,6 +80,44 @@ class CMSComponent( object ):
     def __str__( self ):
         "Abbreviated string representation"
         return self.name
+
+    def get_temp_folder_path( self ):
+        "Return the path to the component's temporary folder."
+        return "/tmp/"+self.name+"/"
+
+    def create_temp_folder( self ):
+        "Create the component's temporary folder."
+        temp_path = self.get_temp_folder_path()
+        try:
+            os.mkdir(temp_path)
+        except:
+            if not os.path.isdir(temp_path):
+                error("Cannot create temporary folder %s.\n" % temp_path)
+
+    def remove_temp_folder( self ):
+        "Remove the component's temporary folder."
+        temp_path = self.get_temp_folder_path()
+        shutil.rmtree(temp_path, ignore_errors=True)
+
+    def store_temp_folder( self ):
+        "UNUSED. Store temporary folder into configuration folder."
+        temp_path = self.get_temp_folder_path()
+        config_folder = os.path.dirname(self.get_config_file_name())
+        config_path = config_folder+"/"+os.path.basename(temp_path)
+        try:
+            shutil.move(temp_path, new_path)
+        except:
+            pass
+
+    def reload_temp_folder( self ):
+        "UNUSED. Reload the temporary folder from the configuration folder."
+        temp_path = self.get_temp_folder_path()
+        config_folder = os.path.dirname(self.get_config_file_name())
+        config_path = old_folder+"/"+os.path.basename(temp_path)
+        try:
+            shutil.move(config_path, temp_path)
+        except:
+            pass
 
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
@@ -160,6 +199,13 @@ class CMSComponent( object ):
             config_error(error_msg, config_raw=config_raw)
             return
 
+    def remove_comp_config( self ):
+        "Remove the configurations of this component."
+        try:
+            os.remove(self.get_config_file_name())
+        except:
+            pass
+
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."
         # NOTE: This should be overridden.
@@ -191,6 +237,9 @@ class VirtualMachine( CMSComponent ):
         self.config_hv_name = None   # temp holder for HV name in config
         self.config_is_paused = None # temp holder for paused status in config
         self.terms = []              # temp holder for terms to kill on removal
+
+        #self.reload_temp_folder()
+        self.create_temp_folder()
 
         self.check_comp_config()
         self.update_comp_config()
@@ -381,10 +430,8 @@ class VirtualMachine( CMSComponent ):
 
     def remove( self ):
         "Remove traces of the VM from existence."
-        try:      # Remove config file.
-            os.remove(self.get_config_file_name())
-        except:
-            pass
+        self.remove_comp_config()
+        self.remove_temp_folder()
 
     def shutdown( self ):
         "Shutdown VM when CMSnet is shutting down."
@@ -392,6 +439,7 @@ class VirtualMachine( CMSComponent ):
             return
         self.lock_comp_config()    # Prevent adjustments to config file.
         self.stop()
+        # self.store_temp_folder()
 
 
 class Hypervisor( CMSComponent ):

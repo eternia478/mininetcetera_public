@@ -2,10 +2,9 @@
 
 NAME=$1
 if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+if [ ! -d /tmp/$NAME ]; then echo "No such directory /tmp/$NAME."; exit 1; fi
 
-cd /tmp/$NAME
-
-cd server
+echo "Pause."
 
 kill `cat /tmp/$NAME/pid` 2> /dev/null
 sleep 1
