@@ -104,6 +104,7 @@ from mininet.term import cleanUpScreens, makeTerms
 
 from cmsnet.cms_comp import CMSComponent, VirtualMachine, Hypervisor
 from cmsnet.cms_log import config_error
+import sys
 import random
 import socket
 import json
@@ -166,7 +167,7 @@ class CMSnet( object ):
 
         self.possible_modes = CMSnet.getPossibleVMDistModes()
         self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
-        self.possible_scripts = CMSnet.getPossibleVMScripts()
+        self.possible_scripts = self.getPossibleVMScripts()
 
         self.last_hv = None
         self.hv_cycle = []
@@ -617,13 +618,12 @@ class CMSnet( object ):
         "Dynamically obtain all possible message levels for the controller."
         return ["all", "instantiated", "migrated", "destroyed", "none"]
 
-    @classmethod
-    def getPossibleVMScripts( cls ):
+    def getPossibleVMScripts( self ):
         "Dynamically obtain all possible scripts for VMs to run."
         if self.script_folder and os.path.isdir(self.script_folder):
             return os.listdir(self.script_folder)
 
-        for pypath in sys.path[0]:
+        for pypath in sys.path:
             if not pypath: pypath = "."
             script_folder = pypath+"/cmsnet/vm_scripts"
             if os.path.isdir(script_folder):

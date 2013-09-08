@@ -5,6 +5,12 @@ instead of the Mininet one (which uses Python's cmd module).
 This is only a base class. All attempts to run CMSnet should be done by
 subclasses to use its functionality via extension of methods.
 """
+import os
+import sys
+if 'PYTHONPATH' in os.environ:
+    sys.path = os.environ[ 'PYTHONPATH' ].split( ':' ) + sys.path
+print "PYTHONPATH   = %s" % os.environ.get( 'PYTHONPATH' )
+print "POX_CORE_DIR = %s" % os.environ.get( 'POX_CORE_DIR' )
 
 #from mininet.net import Mininet, MininetWithControlNet, VERSION
 from mininet.node import ( Node, Host, CPULimitedHost,
@@ -423,7 +429,7 @@ class CMSAPI (object):
       raise CMSTypeError('vm_cls must be None or a subclass of VirtualMachine')
 
     self._check_vm_name_available(vm_name)
-    if vm_script and vm_script not in self.cn.possible_scripts:
+    if vm_script and vm_script not in self.net.possible_scripts:
       raise CMSInvalidChoiceValueError('vm_script', vm_script)
 
     vm = self.net.createVM(vm_name, vm_script, vm_cls, **params)

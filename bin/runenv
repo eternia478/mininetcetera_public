@@ -3,7 +3,7 @@
 PYTHONPATH=/home/mininet/mininet_folder/
 POX_CORE_DIR=/home/mininet/pox_folder/
 CONFIG_FOLDER_LOCATION=.
-RUNFILE=$1
+RUNFILE=$PYTHONPATH/bin/$1
 shift 1
 
 if [ ! -f $RUNFILE ]; then

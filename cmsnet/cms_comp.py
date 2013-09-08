@@ -305,7 +305,7 @@ class VirtualMachine( CMSComponent ):
         if not self.vm_script:
             return ""
         assert script_type in ["start", "pause", "resume", "stop"]
-        script_folder = self.cmsnet_info.get("script_folder")
+        script_folder = self._cmsnet_info.get("script_folder")
         if not script_folder:
             script_folder = "."
         return "/".join([script_folder, self.vm_script, script_type])
@@ -313,7 +313,7 @@ class VirtualMachine( CMSComponent ):
     def get_vm_script_params( self ):
         "Get the parameters to run the VM script with."
         default_params = { 'NAME': self.name,
-                           'IP': self.IP(),
+                           'IP': self.IP,
                            'SERVER_IP': '127.0.0.1' }
         default_params.update(self.vm_script_params)
         return default_params
@@ -326,7 +326,7 @@ class VirtualMachine( CMSComponent ):
         args = ""
         known_params = ['NAME', 'IP', 'SERVER_IP']
         for param in known_params:
-            args += " {param}={{{param}}}".format(param=param)
+            args += " {{{param}}}".format(param=param)
         for param in self.vm_script_params:
             if param not in known_params:
                 args += " {param}={{{param}}}".format(param=param)
