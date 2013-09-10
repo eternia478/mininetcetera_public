@@ -17,25 +17,42 @@ log = core.getLogger()
 
 
 class CMSEvent (Event):
-  def __init__ (self, added=[], removed=[], reason=None):
-    Event.__init__(self)
-    self.added = added
-    self.removed = removed
-
-    # Reason for modification.
-    # Presently, this is only used for removals and is either one of OFPRR_x,
-    # or None if it does not correlate to any of the items in the spec.
-    self.reason = reason
+  def __init__ (self, cms_msg):
+    super(CMSEvent, self).__init__()
+    self.cms_msg = cms_msg
 
 
-class CMSEventMixin (EventMixin):
-  """
-  EventMixin subclass for raising CMS events.
-  """
-  _eventMixin_events = set([FlowTableModification])
+class CMSVMEvent (CMSEvent):
+  def __init__ (self, cms_msg, vm_info, old_hv_info={}, new_hv_info={}):
+    super(CMSVMEvent, self).__init__(cms_msg)
+    assert isinstance(vm_info, dict)
+    assert isinstance(old_hv_info, dict)
+    assert isinstance(new_hv_info, dict)
+    self.vm_info = vm_info
+    self.old_hv_info = old_hv_info
+    self.new_hv_info = new_hv_info
 
 
-class CMSBot (ChannelBot):
+class CMSInitialize (CMSVMEvent):
+  pass
+
+
+class CMSMigrate (CMSVMEvent):
+  pass
+
+
+class CMSTerminate (CMSVMEvent):
+  pass
+
+
+class CMSSynchronize (CMSEvent):
+  def __init__ (self, cms_msg, cms_data):
+    super(CMSSynchronize, self).__init__(cms_msg)
+    assert isinstance(cms_data, dict)
+    self.cms_data = cms_data
+
+
+class CMSBot (ChannelBot, EventMixin):
   """
   Channel bot dealing with messages on the CMS channel.
 
@@ -46,6 +63,9 @@ class CMSBot (ChannelBot):
    - "synchronize"
   Any other messages are simply discarded.
   """
+  _eventMixin_events = set([CMSInitialize, CMSMigrate, CMSTerminate,
+                            CMSSynchronize])
+
   def _exec_cmd_instantiate (self, event):
     """
     Handle received messages of cmd type "instantiate."
@@ -67,59 +87,10 @@ class CMSBot (ChannelBot):
     Handle received messages of cmd type "synchronize."
     """
 
-
-  def _exec_cmd_migrate (self, event):
-    print "migrated"
-    print "CMBot msg: %s" % event.msg
-    msg = event.msg
-    if msg.get("CHANNEL") != 'CMS':
-      log.warn("Not correct channel: %s\n" % msg.get("CHANNEL"))
-      return
-    assert msg.get("CHANNEL") == 'CMS'
-    msg_level = msg.get("msg_level")
-    msg_cmd = msg.get("cmd")
-    host = msg.get("host")
-    new_hv = msg.get("new_hv")
-    if msg_cmd == msg_level or msg_level == "all":
-      log.info("msg_cmd: %s" % msg_cmd)
-      log.info("host: %s" % host)
-      log.info("new_hv: %s" % new_hv)
-
-  def _exec_cmd_instantiate (self, event):
-    print "instantiated"
-    print "CMBot msg: %s" % event.msg
-    msg = event.msg
-    if msg.get("CHANNEL") != 'CMS':
-      log.warn("Not correct channel: %s\n" % msg.get("CHANNEL"))
-      return
-    assert msg.get("CHANNEL") == 'CMS'
-    msg_level = msg.get("msg_level")
-    msg_cmd = msg.get("cmd")
-    host = msg.get("host")
-    new_hv = msg.get("new_hv")
-    if msg_cmd == msg_level or msg_level == "all":
-      log.info("msg_cmd: %s" % msg_cmd)
-      log.info("host: %s" % host)
-      log.info("new_hv: %s" % new_hv)
-
-  def _exec_cmd_terminate (self, event):
-    print "destroyed"
-    print "CMBot msg: %s" % event.msg
-    msg = event.msg
-    if msg.get("CHANNEL") != 'CMS':
-      log.warn("Not correct channel: %s\n" % msg.get("CHANNEL"))
-      return
-    assert msg.get("CHANNEL") == 'CMS'
-    msg_level = msg.get("msg_level")
-    msg_cmd = msg.get("cmd")
-    host = msg.get("host")
-    new_hv = msg.get("new_hv")
-    if msg_cmd == msg_level or msg_level == "all":
-      log.info("msg_cmd: %s" % msg_cmd)
-      log.info("host: %s" % host)
-      log.info("new_hv: %s" % new_hv)
-
   def _unhandled (self, event):
+    """
+    Unhandled cmd type.
+    """
     print "unhandled"
     print "CMBot msg: %s" % event.msg
     msg = event.msg
@@ -129,9 +100,13 @@ class CMSBot (ChannelBot):
     assert msg.get("CHANNEL") == 'CMS'
 
 
+cmsbot = None
+
+
 def launch (nexus = "MessengerNexus"):
   def start (nexus):
+    global cmsbot
     real_nexus = core.components[nexus]
-    CMSBot(real_nexus.get_channel('CMS'))
+    cmsbot = CMSBot(real_nexus.get_channel('CMS'))
 
   core.call_when_ready(start, nexus, args=[nexus])
