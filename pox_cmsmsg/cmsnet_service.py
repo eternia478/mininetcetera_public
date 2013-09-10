@@ -70,34 +70,69 @@ class CMSBot (ChannelBot, EventMixin):
     """
     Handle received messages of cmd type "instantiate."
     """
-    pass
+    msg = event.msg
+    log.debug("Received instantiate CMS message: %s" % (msg,))
+    if msg.get("CHANNEL") != 'CMS':
+      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
+      return
+    assert msg.get("cmd") == "instantiate"
+    vm_info = msg.get("vm_info")
+    new_hv_info = msg.get("new_hv_info")
+    self.raiseEvent(CMSInitialize(msg, vm_info, new_hv_info=new_hv_info))
 
   def _exec_cmd_migrate (self, event):
     """
     Handle received messages of cmd type "migrate."
     """
+    msg = event.msg
+    log.debug("Received migrate CMS message: %s" % (msg,))
+    if msg.get("CHANNEL") != 'CMS':
+      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
+      return
+    assert msg.get("cmd") == "migrate"
+    vm_info = msg.get("vm_info")
+    old_hv_info = msg.get("old_hv_info")
+    new_hv_info = msg.get("new_hv_info")
+    self.raiseEvent(CMSMigrate(msg, vm_info, old_hv_info, new_hv_info))
 
   def _exec_cmd_terminate (self, event):
     """
     Handle received messages of cmd type "terminate."
     """
+    msg = event.msg
+    log.debug("Received terminate CMS message: %s" % (msg,))
+    if msg.get("CHANNEL") != 'CMS':
+      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
+      return
+    assert msg.get("cmd") == "terminate"
+    vm_info = msg.get("vm_info")
+    old_hv_info = msg.get("old_hv_info")
+    self.raiseEvent(CMSTerminate(msg, vm_info, old_hv_info=old_hv_info))
 
   def _exec_cmd_synchronize (self, event):
     """
     Handle received messages of cmd type "synchronize."
     """
+    msg = event.msg
+    log.debug("Received synchronize CMS message: %s" % (msg,))
+    if msg.get("CHANNEL") != 'CMS':
+      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
+      return
+    assert msg.get("cmd") == "synchronize"
+    cms_data = msg.get("cms_data")
+    self.raiseEvent(CMSSynchronize(msg, cms_data))
 
   def _unhandled (self, event):
     """
     Unhandled cmd type.
     """
-    print "unhandled"
-    print "CMBot msg: %s" % event.msg
     msg = event.msg
+    log.debug("Received unhandled CMS message: %s" % (msg,))
     if msg.get("CHANNEL") != 'CMS':
       log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
       return
-    assert msg.get("CHANNEL") == 'CMS'
+    cmd = msg.get("cmd")
+    log.warn("Invalid cmd type %s for CMS message!" % (cmd,))
 
 
 cmsbot = None
