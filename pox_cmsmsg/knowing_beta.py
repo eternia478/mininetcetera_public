@@ -12,8 +12,8 @@ from pox.messenger import cmsnet_service
 # Even a simple usage of the logger is much nicer than print!
 log = core.getLogger()
 
-# This table maps hypervisor edge switch name to information about
-# the switch (connection, fabric port, VM name to port mapping).
+# This table maps hypervisor edge switch dpid to information about
+# the switch (name, connection, fabric port, VM name->port).
 hv_info_table = {}
 
 # This table maps VM host node name to information about the node
@@ -33,23 +33,26 @@ all_ports = of.OFPP_FLOOD
 
 
 class HVInfo (object):
-    """
-    Container for information of the HV edge switch.
-    """
-    def __init__ (self, connection):
-        self.connection = connection
-        self.fabric_port = None
-        self.vm_ports = {}
+  """
+  Container for information of a hypervisor edge switch.
+  """
+  def __init__ (self, dpid, connection):
+    self.name = None
+    self.dpid = dpid
+    self.connection = connection
+    self.fabric_port = None
+    self.vm_ports = {}
 
 
 class VMInfo (object):
-    """
-    Container for information of the HV edge switch.
-    """
-    def __init__ (self, mac_addr, ip_addr, hv):
-        self.mac_addr = mac_addr
-        self.ip_addr = ip_addr
-        self.hv = hv
+  """
+  Container for information of a host node running a VM.
+  """
+  def __init__ (self, name, mac_addr, ip_addr, hv):
+    self.name = name
+    self.mac_addr = mac_addr
+    self.ip_addr = ip_addr
+    self.hv = hv
 
 
 
@@ -94,11 +97,21 @@ def _handle_PacketIn (event):
 
 
 def launch (disable_flood = False):
-  def start_switch (event):
+  def switch_up (event):
     global hv_info_table
-    log.debug("Controlling %s" % (event.connection,))
-    hv_info_table[name] = HVInfo(event.connection)
-  core.openflow.addListenerByName("ConnectionUp", start_switch)
+    log.debug("Controlling %s, dpid=%d" % (event.connection, event.dpid))
+    hv_info_table[event.dpid] = HVInfo(event.connection)
+
+  def switch_down (event):
+    global hv_info_table
+    log.debug("Disconnecting %s, dpid=%d" % (event.connection, event.dpid))
+    del hv_info_table[event.dpid]
+
+  core.openflow.addListenerByName("ConnectionUp", switch_up)
+  core.openflow.addListenerByName("ConnectionDown", switch_down)
+  if not cmsnet_service.cms_em:
+      cmsnet_service.cms_em = CMSEventMixin()
+  cmsnet_service.cms_em.addListener(
 
 
   global all_ports
