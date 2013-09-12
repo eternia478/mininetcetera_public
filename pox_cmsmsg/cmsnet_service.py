@@ -19,6 +19,7 @@ log = core.getLogger()
 class CMSEvent (Event):
   def __init__ (self, cms_msg):
     super(CMSEvent, self).__init__()
+    assert isinstance(cms_msg, dict)
     self.cms_msg = cms_msg
 
 

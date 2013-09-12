@@ -49,23 +49,55 @@ class KnowingSwitchBeta (object):
     # running the VM (MAC address, IP address, HV dpid).
     self.vm_info_table = {}
 
-  def _handle_CMSInitialize (event):
-    pass
-    msg = of.ofp_flow_mod()
-    msg.match.dl_dst = packet.src
-    msg.match.dl_src = packet.dst
-    msg.actions.append(of.ofp_action_output(port = event.port))
-    event.connection.send(msg)
+  def _handle_CMSInitialize (self, event):
+    vm_name = event.vm_info.get("name")
+    new_hv_dpid = event.new_hv_info.get("dpid")
+    new_hv_vm_port = event.new_hv_info.get("vm_port")
+    vm_param = {"hv_dpid": new_hv_dpid}
+    vm_param.update(event.vm_info)
+    self.vm_info_table[vm_name] = VMInfo(**vm_param)
+    new_hv_info = self.hv_info_table[new_hv_dpid]
+    new_hv_info.vm_ports[vm_name] = new_hv_vm_port
+    add_msg = of.ofp_flow_mod()
+    add_msg.command = OFPFC_ADD
+    add_msg.match.dl_dst = vm_info.mac_addr
+    add_msg.actions.append(of.ofp_action_output(port=new_hv_vm_port))
+    new_hv_info.connection.send(add_msg)
 
-  def _handle_CMSMigrate (event):
-    pass
+  def _handle_CMSMigrate (self, event):
+    vm_name = event.vm_info.get("name")
+    old_hv_dpid = event.old_hv_info.get("dpid")
+    new_hv_dpid = event.new_hv_info.get("dpid")
+    new_hv_vm_port = event.new_hv_info.get("vm_port")
+    vm_info = self.vm_info_table[vm_name]
+    vm_info.hv_dpid = new_hv_dpid
+    old_hv_info = self.hv_info_table[old_hv_dpid]
+    del old_hv_info.vm_ports[vm_name]
+    del_msg = of.ofp_flow_mod()
+    del_msg.command = OFPFC_DELETE
+    del_msg.match.dl_dst = vm_info.mac_addr
+    old_hv_info.connection.send(del_msg)
+    new_hv_info = self.hv_info_table[new_hv_dpid]
+    new_hv_info.vm_ports[vm_name] = new_hv_vm_port
+    add_msg = of.ofp_flow_mod()
+    add_msg.command = OFPFC_ADD
+    add_msg.match.dl_dst = vm_info.mac_addr
+    add_msg.actions.append(of.ofp_action_output(port=new_hv_vm_port))
+    new_hv_info.connection.send(add_msg)
 
-  def _handle_CMSTerminate (event):
-    pass
+  def _handle_CMSTerminate (self, event):
+    vm_name = event.vm_info.get("name")
+    old_hv_dpid = event.old_hv_info.get("dpid")
+    del self.vm_info_table[vm_name]
+    old_hv_info = self.hv_info_table[old_hv_dpid]
+    del old_hv_info.vm_ports[vm_name]
+    del_msg = of.ofp_flow_mod()
+    del_msg.command = OFPFC_DELETE
+    del_msg.match.dl_dst = vm_info.mac_addr
+    old_hv_info.connection.send(del_msg)
 
-  def _handle_CMSSynchronize (event):
+  def _handle_CMSSynchronize (self, event):
     pass
-
 
 
 
