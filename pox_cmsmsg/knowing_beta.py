@@ -53,11 +53,14 @@ class KnowingSwitchBeta (object):
     vm_name = event.vm_info.get("name")
     new_hv_dpid = event.new_hv_info.get("dpid")
     new_hv_vm_port = event.new_hv_info.get("vm_port")
+
     vm_param = {"hv_dpid": new_hv_dpid}
     vm_param.update(event.vm_info)
     self.vm_info_table[vm_name] = VMInfo(**vm_param)
+
     new_hv_info = self.hv_info_table[new_hv_dpid]
     new_hv_info.vm_ports[vm_name] = new_hv_vm_port
+
     add_msg = of.ofp_flow_mod()
     add_msg.command = OFPFC_ADD
     add_msg.match.dl_dst = vm_info.mac_addr
@@ -69,16 +72,21 @@ class KnowingSwitchBeta (object):
     old_hv_dpid = event.old_hv_info.get("dpid")
     new_hv_dpid = event.new_hv_info.get("dpid")
     new_hv_vm_port = event.new_hv_info.get("vm_port")
+
     vm_info = self.vm_info_table[vm_name]
     vm_info.hv_dpid = new_hv_dpid
+
     old_hv_info = self.hv_info_table[old_hv_dpid]
     del old_hv_info.vm_ports[vm_name]
+
     del_msg = of.ofp_flow_mod()
     del_msg.command = OFPFC_DELETE
     del_msg.match.dl_dst = vm_info.mac_addr
     old_hv_info.connection.send(del_msg)
+
     new_hv_info = self.hv_info_table[new_hv_dpid]
     new_hv_info.vm_ports[vm_name] = new_hv_vm_port
+
     add_msg = of.ofp_flow_mod()
     add_msg.command = OFPFC_ADD
     add_msg.match.dl_dst = vm_info.mac_addr
@@ -88,16 +96,58 @@ class KnowingSwitchBeta (object):
   def _handle_CMSTerminate (self, event):
     vm_name = event.vm_info.get("name")
     old_hv_dpid = event.old_hv_info.get("dpid")
+
     del self.vm_info_table[vm_name]
+
     old_hv_info = self.hv_info_table[old_hv_dpid]
     del old_hv_info.vm_ports[vm_name]
+
     del_msg = of.ofp_flow_mod()
     del_msg.command = OFPFC_DELETE
     del_msg.match.dl_dst = vm_info.mac_addr
     old_hv_info.connection.send(del_msg)
 
   def _handle_CMSSynchronize (self, event):
-    pass
+    # Update information from cms_data
+    for hv_dpid in event.cms_data
+      hv_data = event.cms_data[hv_dpid]
+      hv_info = self.hv_info_table[hv_dpid]
+      hv_info.name = hv_data.name
+      hv_info.fabric_port = hv_data.fabric_port
+      vm_ports = {}
+      for vm_name in hv_data.vm_data_map
+        vm_data = hv_data.vm_data_map[vm_name]
+        vm_ports[vm_name] = vm_data.vm_port
+        vm_param = {"hv_dpid": hv_dpid}
+        vm_param.update(vm_data.vm_info)
+        self.vm_info_table[vm_name] = VMInfo(**vm_param)
+      hv_info.vm_ports = vm_ports
+
+    for hv_dpid in self.hv_info_table:
+      hv_info = self.hv_info_table[hv_dpid]
+
+      # Delete previous stuff
+      del_all_msg = of.ofp_flow_mod()
+      del_all_msg.command = OFPFC_DELETE
+      hv_info.connection.send(del_all_msg)
+
+      # Add default entry for sending to fabric
+      fabric_port = hv_info.fabric_port
+      add_fabric_msg = of.ofp_flow_mod()
+      add_fabric_msg.command = OFPFC_ADD
+      add_fabric_msg.priority = 0
+      add_fabric_msg.actions.append(of.ofp_action_output(port=fabric_port))
+      hv_info.connection.send(add_fabric_msg)
+
+      # Add entries for sending to VM's
+      for vm_name in hv_info.vm_ports:
+        vm_port = hv_info.vm_ports[vm_name]
+        vm_mac_addr = self.vm_info_table[vm_name].mac_addr
+        add_msg = of.ofp_flow_mod()
+        add_msg.command = OFPFC_ADD
+        add_msg.match.dl_dst = vm_mac_addr
+        add_msg.actions.append(of.ofp_action_output(port=vm_port))
+        hv_info.connection.send(add_msg)
 
 
 
