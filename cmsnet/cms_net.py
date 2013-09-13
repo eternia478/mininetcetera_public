@@ -562,6 +562,19 @@ class CMSnet( object ):
         except Exception,e:
             warn("\nCannot connect to controller: %s\n" % str(e))
 
+        if self.connection_socket:
+            msg = {
+              'CHANNEL'      : 'CMS',
+              'cmd'          : 'synchronize',
+              #'msg_level'    : self.msg_level,
+              'hv_info_list' : [hv.get_info() for hv in self.HVs],
+              'vm_info_list' : [vm.get_info() for vm in self.VMs],
+            }
+            try:
+                self.controller_socket.send(json.dumps(msg))
+            except Exception,e:
+                warn("\nCannot send to controller: %s\n" % str(e))
+
     def close_controller_connection( self ):
         "Close the connection to the controller."
         if self.controller_socket:
@@ -572,16 +585,18 @@ class CMSnet( object ):
             self.controller_socket.close()
             self.controller_socket = None
 
-    def send_msg_to_controller(self, cmd_type, vm):
+    def send_msg_to_controller( self, cmd_type, vm, old_vm_info ):
         "Send a CMS message to the controller."
-        msg = {
-          'CHANNEL'   : 'CMS',
-          'cmd'       : cmd_type,
-          'msg_level' : self.msg_level,
-          'host'      : vm.name,
-          'new_hv'    : vm.hv_name
-        }
+        assert cmd_type in ['instantiate', 'migrate', 'terminate']
+        assert old_vm_info.get("name") == vm.name
         if self.controller_socket:
+            msg = {
+              'CHANNEL'     : 'CMS',
+              'cmd'         : cmd_type,
+              #'msg_level'   : self.msg_level,
+              'new_vm_info' : vm.get_info(),
+              'old_vm_info' : old_vm_info,
+            }
             try:
                 self.controller_socket.send(json.dumps(msg))
             except Exception,e:
@@ -864,10 +879,11 @@ class CMSnet( object ):
         assert not vm.is_running()
         assert hv.is_enabled()
 
+        old_vm_info = vm.get_info()
         self.mn.moveLink(vm.node, hv.node)
         vm.launchOn(hv)
         self.last_hv = hv
-        self.send_msg_to_controller("instantiated", vm)
+        self.send_msg_to_controller("instantiate", vm, old_vm_info)
 
     def migrateVM( self, vm, hv ):
         "Migrate a running image to another hypervisor."
@@ -886,11 +902,12 @@ class CMSnet( object ):
         assert vm.is_running()
         assert hv.is_enabled()
 
+        old_vm_info = vm.get_info()
         if not vm.is_paused():
             self.mn.moveLink(vm.node, hv.node)
         vm.moveTo(hv)
         self.last_hv = hv
-        self.send_msg_to_controller("migrated", vm)
+        self.send_msg_to_controller("migrate", vm, old_vm_info)
 
     def pauseVM( self, vm ):
         "Pause a currently running VM."
@@ -902,9 +919,10 @@ class CMSnet( object ):
         assert vm.is_running()
         assert not vm.is_paused()
 
+        old_vm_info = vm.get_info()
         vm.pause()
         self.mn.removeLink(vm.node)
-        self.send_msg_to_controller("paused", vm)
+        self.send_msg_to_controller("terminate", vm, old_vm_info)
 
     def resumeVM( self, vm ):
         "Resume a currently paused VM."
@@ -916,9 +934,10 @@ class CMSnet( object ):
         assert vm.is_running()
         assert vm.is_paused()
 
+        old_vm_info = vm.get_info()
         self.mn.moveLink(vm.node, vm.hv.node)
         vm.resume()
-        self.send_msg_to_controller("resumed", vm)
+        self.send_msg_to_controller("instantiate", vm, old_vm_info)
 
     def stopVM( self, vm ):
         "Stop a running image."
@@ -929,11 +948,12 @@ class CMSnet( object ):
         assert isinstance(vm, VirtualMachine)
         assert vm.is_running()
 
+        old_vm_info = vm.get_info()
         if vm.is_paused():
             self.resumeVM(vm)
         vm.stop()
         self.mn.removeLink(vm.node)
-        self.send_msg_to_controller("destroyed", vm)
+        self.send_msg_to_controller("terminate", vm, old_vm_info)
 
     def deleteVM( self, vm ):
         "Remove the virtual machine image from the hypervisor."
