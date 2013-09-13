@@ -178,6 +178,8 @@ class CMSnet( object ):
         self._hv_cycle_names = None
         self._cycle_pos_temp = None
 
+        self.create_temp_folder()
+
         self._allow_write_net_config = True
         if not self.new_config:
             self.check_net_config()
@@ -310,6 +312,19 @@ class CMSnet( object ):
         result = test( *args, **kwargs )
         self.stop()
         return result
+
+    def get_temp_folder_path( self ):
+        "Return the path to CMSnet's temporary folder."
+        return "/tmp/cmsnet/"
+
+    def create_temp_folder( self ):
+        "Create CMSnet's temporary folder."
+        temp_path = self.get_temp_folder_path()
+        try:
+            os.makedirs(temp_path)
+        except:
+            if not os.path.isdir(temp_path):
+                error("Cannot create temporary folder %s.\n" % temp_path)
 
     def get_config_file_name( self ):
         "Return the file name of the configuration file."

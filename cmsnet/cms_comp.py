@@ -90,13 +90,13 @@ class CMSComponent( object ):
 
     def get_temp_folder_path( self ):
         "Return the path to the component's temporary folder."
-        return "/tmp/"+self.name+"/"
+        return "/tmp/cmsnet/"+self.name+"/"
 
     def create_temp_folder( self ):
         "Create the component's temporary folder."
         temp_path = self.get_temp_folder_path()
         try:
-            os.mkdir(temp_path)
+            os.makedirs(temp_path)
         except:
             if not os.path.isdir(temp_path):
                 error("Cannot create temporary folder %s.\n" % temp_path)
