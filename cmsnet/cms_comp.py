@@ -81,6 +81,13 @@ class CMSComponent( object ):
         "Abbreviated string representation"
         return self.name
 
+    def get_info( self ):
+        "Get information to be sent with a CMS message to the controller."
+        info = {
+          'name' : self.name,
+        }
+        return info
+
     def get_temp_folder_path( self ):
         "Return the path to the component's temporary folder."
         return "/tmp/"+self.name+"/"
@@ -319,10 +326,44 @@ class VirtualMachine( CMSComponent ):
             return self.hv.name
         return None
 
+    @property
+    def hv_dpid( self ):
+        if isinstance(self.hv, Hypervisor):
+            return self.hv.dpid
+        return None
+
+    @property
+    def hv_port_to_vm( self ):
+        if self.is_running() and not self.is_paused():
+            intf = self.node.defaultIntf()
+            intf_other = None
+            assert intf is not None
+            assert intf.link != None
+            assert intf.link.intf1 == intf or intf.link.intf2 == intf
+            assert intf.node == self.node
+            if intf.link.intf1 == intf:
+                intf_other = intf.link.intf2
+            elif intf.link.intf2 == intf:
+                intf_other = intf.link.intf1
+            assert intf_other.node is self.hv:
+            return intf_other.name
+        return None
+
     def __repr__( self ):
         "More informative string representation"
         # TODO: This should be different.
         return repr(self.node)
+
+    def get_info( self ):
+        "Get information to be sent with a CMS message to the controller."
+        info = {
+          'name'          : self.name,
+          'mac_addr'      : self.MAC,
+          'ip_addr'       : self.IP,
+          'hv_dpid'       : self.hv_dpid,
+          'hv_port_to_vm' : self.hv_port_to_vm,
+        }
+        return info
 
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
@@ -472,6 +513,15 @@ class Hypervisor( CMSComponent ):
             vm.update_comp_config()
 
     @property
+    def dpid( self ):
+        return self.node.dpid
+
+    @dpid.setter
+    def dpid( self, dpid ):
+        self.node.dpid = dpid
+        self.update_comp_config()
+
+    @property
     def vm_dist_limit( self ):
         return self._vm_dist_limit
 
@@ -485,6 +535,15 @@ class Hypervisor( CMSComponent ):
         # TODO: This should be different.
         return repr(self.node)
 
+    def get_info( self ):
+        "Get information to be sent with a CMS message to the controller."
+        info = {
+          'name'         : self.name,
+          'dpid'         : self.dpid,
+          'fabric_ports' : [self.name+"-eth0"],
+        }
+        return info
+
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
         if not self.config_folder:
@@ -494,6 +553,7 @@ class Hypervisor( CMSComponent ):
 
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."
+        config["dpid"] = self.dpid
         config["vm_dist_limit"] = self.vm_dist_limit
         config["_enabled"] = self._enabled
 
