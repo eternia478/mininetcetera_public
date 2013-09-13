@@ -26,17 +26,40 @@ class KnowingSwitchBeta (object):
     # running the VM (MAC address, IP address, HV dpid).
     self.vm_info_table = {}
 
-
   def _get_hv_port_no (self, hv_intf_name, hv_connection):
     """
     Temporary measure as a workaround a bug in POX to get correct port number.
     """
-    hv_connection = core.openflow.connections[int(hv_dpid, 16)]
     #return hv_connection.ports[hv_intf_name]
     is_same_port = lambda p: p.name == hv_intf_name
     all_possible_ports = filter(is_same_port, hv_connection.ports._ports)
     hv_port = max([p.port_no for p in all_possible_ports])
     return hv_port
+
+  def _add_new_flow_mod (self, vm_info):
+    """
+    Send a flow mod message to add a new entry for the VM.
+    """
+    hv_connection = core.openflow.connections[int(vm_info.hv_dpid, 16)]
+    hv_port_to_vm = self._get_hv_port_no(vm_info.hv_port_to_vm, hv_connection)
+    #hv_port_to_vm = hv_connection.ports[vm_info.hv_port_to_vm]
+
+    add_msg = of.ofp_flow_mod()
+    add_msg.command = OFPFC_ADD
+    add_msg.match.dl_dst = vm_info.mac_addr
+    add_msg.actions.append(of.ofp_action_output(port=hv_port_to_vm))
+    hv_connection.send(add_msg)
+
+  def _remove_old_flow_mod (self, vm_info):
+    """
+    Send a flow mod message to remove the old entry for the VM.
+    """
+    hv_connection = core.openflow.connections[int(vm_info.hv_dpid, 16)]
+
+    del_msg = of.ofp_flow_mod()
+    del_msg.command = OFPFC_DELETE
+    del_msg.match.dl_dst = vm_info.mac_addr
+    hv_connection.send(del_msg)
 
   def _handle_CMSInitialize (self, event):
     """
@@ -45,19 +68,8 @@ class KnowingSwitchBeta (object):
     Save the new VMInfo instance. Then, add a new flow table entry for the VM
     on the VM's hypervisor edge switch.
     """
-    new_vm_info = event.new_vm_info
-    self.vm_info_table[new_vm_info.name] = new_vm_info
-
-    new_hv_connection = core.openflow.connections[int(new_vm_info.hv_dpid, 16)]
-    new_intf_name = new_vm_info.hv_port_to_vm
-    new_hv_port_to_vm = self._get_hv_port_no(new_intf_name, new_hv_connection)
-    #new_hv_port_to_vm = new_hv_connection.ports[new_vm_info.hv_port_to_vm]
-
-    add_msg = of.ofp_flow_mod()
-    add_msg.command = OFPFC_ADD
-    add_msg.match.dl_dst = new_vm_info.mac_addr
-    add_msg.actions.append(of.ofp_action_output(port=new_hv_port_to_vm))
-    new_hv_connection.send(add_msg)
+    self.vm_info_table[event.new_vm_info.name] = event.new_vm_info
+    self._add_new_flow_mod(event.new_vm_info)
 
   def _handle_CMSMigrate (self, event):
     """
@@ -67,27 +79,9 @@ class KnowingSwitchBeta (object):
     on the original hypervisor edge switch before adding a new one on the edge
     switch for the new hypervisor.
     """
-    old_vm_info = event.old_vm_info
-    new_vm_info = event.new_vm_info
-    self.vm_info_table[new_vm_info.name] = new_vm_info
-
-    old_hv_connection = core.openflow.connections[int(old_vm_info.hv_dpid, 16)]
-
-    del_msg = of.ofp_flow_mod()
-    del_msg.command = OFPFC_DELETE
-    del_msg.match.dl_dst = old_vm_info.mac_addr
-    old_hv_connection.send(del_msg)
-
-    new_hv_connection = core.openflow.connections[int(new_vm_info.hv_dpid, 16)]
-    new_intf_name = new_vm_info.hv_port_to_vm
-    new_hv_port_to_vm = self._get_hv_port_no(new_intf_name, new_hv_connection)
-    #new_hv_port_to_vm = new_hv_connection.ports[new_vm_info.hv_port_to_vm]
-
-    add_msg = of.ofp_flow_mod()
-    add_msg.command = OFPFC_ADD
-    add_msg.match.dl_dst = new_vm_info.mac_addr
-    add_msg.actions.append(of.ofp_action_output(port=new_hv_port_to_vm))
-    new_hv_connection.send(add_msg)
+    self.vm_info_table[event.new_vm_info.name] = event.new_vm_info
+    self._remove_old_flow_mod(event.old_vm_info)
+    self._add_new_flow_mod(event.new_vm_info)
 
   def _handle_CMSTerminate (self, event):
     """
@@ -96,15 +90,8 @@ class KnowingSwitchBeta (object):
     Remove the VMInfo instance. Then, delete the flow table entry for the VM on
     the original hypervisor edge switch.
     """
-    old_vm_info = event.old_vm_info
-    del self.vm_info_table[old_vm_info.name]
-
-    old_hv_connection = core.openflow.connections[int(old_vm_info.hv_dpid, 16)]
-
-    del_msg = of.ofp_flow_mod()
-    del_msg.command = OFPFC_DELETE
-    del_msg.match.dl_dst = old_vm_info.mac_addr
-    old_hv_connection.send(del_msg)
+    del self.vm_info_table[event.old_vm_info.name]
+    self._remove_old_flow_mod(event.old_vm_info)
 
   def _handle_CMSSynchronize (self, event):
     """
@@ -144,15 +131,7 @@ class KnowingSwitchBeta (object):
 
     # Add entries for sending to VM's
     for vm_info in event.vm_info_list:
-      hv_connection = core.openflow.connections[int(vm_info.hv_dpid, 16)]
-      intf_name = vm_info.hv_port_to_vm
-      hv_port_to_vm = self._get_hv_port_no(intf_name, hv_connection)
-      #hv_port_to_vm = hv_connection.ports[vm_info.hv_port_to_vm]
-      add_msg = of.ofp_flow_mod()
-      add_msg.command = OFPFC_ADD
-      add_msg.match.dl_dst = vm_info.mac_addr
-      add_msg.actions.append(of.ofp_action_output(port=hv_port_to_vm))
-      hv_connection.send(add_msg)      
+      self._add_new_flow_mod(new_vm_info)
 
 
 
