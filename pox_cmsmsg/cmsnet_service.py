@@ -16,41 +16,70 @@ from pox.core import core as core
 log = core.getLogger()
 
 
+class HVInfo (object):
+  """
+  Container for information of a hypervisor edge switch.
+  """
+  def __init__ (self, hv_info_dict):
+    assert isinstance(hv_info_dict, dict)
+    self.name = hv_info_dict["name"]
+    self.dpid = hv_info_dict["dpid"]
+    self.fabric_ports = hv_info_dict["fabric_ports"]
+
+
+class VMInfo (object):
+  """
+  Container for information of a host node running a VM.
+  """
+  def __init__ (self, vm_info_dict):
+    assert isinstance(vm_info_dict, dict)
+    self.name = vm_info_dict["name"]
+    self.mac_addr = vm_info_dict["mac_addr"]
+    self.ip_addr = vm_info_dict["ip_addr"]
+    self.hv_dpid = vm_info_dict["hv_dpid"]
+    self.hv_port_to_vm = vm_info_dict["hv_port_to_vm"]
+
+
 class CMSEvent (Event):
+  """
+  Event raised from receiving a CMS message.
+  """
   def __init__ (self, cms_msg):
     super(CMSEvent, self).__init__()
     assert isinstance(cms_msg, dict)
     self.cms_msg = cms_msg
 
 
-class CMSVMEvent (CMSEvent):
-  def __init__ (self, cms_msg, vm_info, old_hv_info={}, new_hv_info={}):
-    super(CMSVMEvent, self).__init__(cms_msg)
-    assert isinstance(vm_info, dict)
-    assert isinstance(old_hv_info, dict)
-    assert isinstance(new_hv_info, dict)
-    self.vm_info = vm_info
-    self.old_hv_info = old_hv_info
-    self.new_hv_info = new_hv_info
+class CMSInitialize (CMSEvent):
+  def __init__ (self, cms_msg):
+    super(CMSInitialize, self).__init__(cms_msg)
+    new_vm_data = cms_msg["new_vm_info"]
+    self.new_vm_info = VMInfo(new_vm_data)
 
 
-class CMSInitialize (CMSVMEvent):
-  pass
+class CMSMigrate (CMSEvent):
+  def __init__ (self, cms_msg):
+    super(CMSMigrate, self).__init__(cms_msg)
+    new_vm_data = cms_msg["new_vm_info"]
+    old_vm_data = cms_msg["old_vm_info"]
+    self.new_vm_info = VMInfo(new_vm_data)
+    self.old_vm_info = VMInfo(old_vm_data)
 
 
-class CMSMigrate (CMSVMEvent):
-  pass
-
-
-class CMSTerminate (CMSVMEvent):
-  pass
+class CMSTerminate (CMSEvent):
+  def __init__ (self, cms_msg):
+    super(CMSTerminate, self).__init__(cms_msg)
+    old_vm_data = cms_msg["old_vm_info"]
+    self.old_vm_info = VMInfo(old_vm_data)
 
 
 class CMSSynchronize (CMSEvent):
-  def __init__ (self, cms_msg, cms_data):
+  def __init__ (self, cms_msg):
     super(CMSSynchronize, self).__init__(cms_msg)
-    assert isinstance(cms_data, dict)
-    self.cms_data = cms_data
+    hv_data_list = cms_msg["hv_info_list"]
+    vm_data_list = cms_msg["vm_info_list"]
+    self.hv_info_list = [HVInfo(hv_data) for hv_data in hv_data_list]
+    self.vm_info_list = [VMInfo(vm_data) for vm_data in vm_data_list]
 
 
 class CMSBot (ChannelBot, EventMixin):
@@ -67,73 +96,57 @@ class CMSBot (ChannelBot, EventMixin):
   _eventMixin_events = set([CMSInitialize, CMSMigrate, CMSTerminate,
                             CMSSynchronize])
 
+  def _check_msg (self, msg, cmd_type):
+    """
+    Check the values stored in the message sent on the CMS channel.
+    """
+    log.debug("Received %s CMS message: %s" % (cmd_type, msg))
+    if msg.get("CHANNEL") != 'CMS':
+      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
+      return
+    if cmd_type != "unhandled":
+      assert cmd_type in ['instantiate', 'migrate', 'terminate']
+      assert msg.get("cmd") == cmd_type
+
   def _exec_cmd_instantiate (self, event):
     """
     Handle received messages of cmd type "instantiate."
     """
     msg = event.msg
-    log.debug("Received instantiate CMS message: %s" % (msg,))
-    if msg.get("CHANNEL") != 'CMS':
-      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
-      return
-    assert msg.get("cmd") == "instantiate"
-    vm_info = msg.get("vm_info")
-    new_hv_info = msg.get("new_hv_info")
-    self.raiseEvent(CMSInitialize(msg, vm_info, new_hv_info=new_hv_info))
+    self._check_msg(msg, "instantiate")
+    self.raiseEvent(CMSInitialize(msg))
 
   def _exec_cmd_migrate (self, event):
     """
     Handle received messages of cmd type "migrate."
     """
     msg = event.msg
-    log.debug("Received migrate CMS message: %s" % (msg,))
-    if msg.get("CHANNEL") != 'CMS':
-      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
-      return
-    assert msg.get("cmd") == "migrate"
-    vm_info = msg.get("vm_info")
-    old_hv_info = msg.get("old_hv_info")
-    new_hv_info = msg.get("new_hv_info")
-    self.raiseEvent(CMSMigrate(msg, vm_info, old_hv_info, new_hv_info))
+    self._check_msg(msg, "migrate")
+    self.raiseEvent(CMSMigrate(msg))
 
   def _exec_cmd_terminate (self, event):
     """
     Handle received messages of cmd type "terminate."
     """
     msg = event.msg
-    log.debug("Received terminate CMS message: %s" % (msg,))
-    if msg.get("CHANNEL") != 'CMS':
-      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
-      return
-    assert msg.get("cmd") == "terminate"
-    vm_info = msg.get("vm_info")
-    old_hv_info = msg.get("old_hv_info")
-    self.raiseEvent(CMSTerminate(msg, vm_info, old_hv_info=old_hv_info))
+    self._check_msg(msg, "terminate")
+    self.raiseEvent(CMSTerminate(msg))
 
   def _exec_cmd_synchronize (self, event):
     """
     Handle received messages of cmd type "synchronize."
     """
     msg = event.msg
-    log.debug("Received synchronize CMS message: %s" % (msg,))
-    if msg.get("CHANNEL") != 'CMS':
-      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
-      return
-    assert msg.get("cmd") == "synchronize"
-    cms_data = msg.get("cms_data")
-    self.raiseEvent(CMSSynchronize(msg, cms_data))
+    self._check_msg(msg, "synchronize")
+    self.raiseEvent(CMSSynchronize(msg))
 
   def _unhandled (self, event):
     """
     Unhandled cmd type.
     """
     msg = event.msg
-    log.debug("Received unhandled CMS message: %s" % (msg,))
-    if msg.get("CHANNEL") != 'CMS':
-      log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
-      return
-    cmd = msg.get("cmd")
-    log.warn("Invalid cmd type %s for CMS message!" % (cmd,))
+    self._check_msg(msg, "unhandled")
+    log.warn("Invalid cmd type %s for CMS message!" % (msg.get("cmd"),))
 
 
 cmsbot = None
