@@ -65,12 +65,36 @@ class CMSMigrate (CMSEvent):
     self.new_vm_info = VMInfo(new_vm_data)
     self.old_vm_info = VMInfo(old_vm_data)
 
+  @property
+  def vm_name (self):
+    return self.new_vm_info.name
+
+  @property
+  def new_hv_dpid (self):
+    return self.new_vm_info.hv_dpid
+
+  @property
+  def old_hv_dpid (self):
+    return self.old_vm_info.hv_dpid
+
+  @property
+  def new_port (self):
+    return self.new_vm_info.hv_port_to_vm
+
 
 class CMSTerminate (CMSEvent):
   def __init__ (self, cms_msg):
     super(CMSTerminate, self).__init__(cms_msg)
     old_vm_data = cms_msg["old_vm_info"]
     self.old_vm_info = VMInfo(old_vm_data)
+
+  @property
+  def vm_name (self):
+    return self.old_vm_info.name
+
+  @property
+  def old_hv_dpid (self):
+    return self.old_vm_info.hv_dpid
 
 
 class CMSSynchronize (CMSEvent):
