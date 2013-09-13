@@ -19,6 +19,10 @@ log = core.getLogger()
 class HVInfo (object):
   """
   Container for information of a hypervisor edge switch.
+
+  name: Name of hypervisor edge switch in CMSnet.
+  dpid: DPID string of hypervisor edge switch.
+  fabric_ports: List of names of hypervisor interfaces connecting to fabrics.
   """
   def __init__ (self, hv_info_dict):
     assert isinstance(hv_info_dict, dict)
@@ -30,6 +34,12 @@ class HVInfo (object):
 class VMInfo (object):
   """
   Container for information of a host node running a VM.
+
+  name: Name of host node running VM in CMSnet.
+  mac_addr: MAC address of host node.
+  ip_addr: IP address of host node.
+  hv_dpid: DPID string of VM's hypervisor edge switch.
+  hv_port_to_vm: Name of hypervisor interface connecting to VM.
   """
   def __init__ (self, vm_info_dict):
     assert isinstance(vm_info_dict, dict)
