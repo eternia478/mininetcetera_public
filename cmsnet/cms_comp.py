@@ -402,25 +402,34 @@ class VirtualMachine( CMSComponent ):
 
     def get_vm_script_params( self ):
         "Get the parameters to run the VM script with."
-        default_params = { 'NAME': self.name,
+        default_params = { 'HOME': self.get_temp_folder_path(),
+                           'NAME': self.name,
                            'IP': self.IP,
                            'SERVER_IP': '127.0.0.1' }
         default_params.update(self.vm_script_params)
         return default_params
+
+    def write_rc_file( self ):
+        "Write the run control file for the script."
+        params = self.get_vm_script_params()
+        try:
+            with open(self.get_temp_folder_path()+"/.cmsnetrc", "w") as f:
+                for arg,val in params.items():
+                    f.write("%s=%s\n" % (arg, val))
+                f.flush()
+        except IOError:
+            error_msg = "Unable to make rc file for %s." % self.name
+            config_error(error_msg)
+            return
 
     def run_vm_script( self, script_type="start" ):
         "Run the VM script with preset parameters."
         if not self.vm_script:
             return
         cmd = self.get_vm_script_cmd(script_type=script_type)
-        args = ""
-        known_params = ['NAME', 'IP', 'SERVER_IP']
-        for param in known_params:
-            args += " {{{param}}}".format(param=param)
-        for param in self.vm_script_params:
-            if param not in known_params:
-                args += " {param}={{{param}}}".format(param=param)
-        self.node.cmd(cmd, args.format(**self.get_vm_script_params()))
+        temp_path = self.get_temp_folder_path()
+        self.write_rc_file()
+        self.node.cmd("cd %s && source .cmsnetrc && %s &" % (temp_path, cmd))
 
     def cloneTo( self, new_vm ):
         "Clone information from this VM to the new VM image."
@@ -439,6 +448,7 @@ class VirtualMachine( CMSComponent ):
         assert hv.is_enabled()
         self.hv = hv
         self.run_vm_script(script_type="start")
+        self.vm_script_pid = self.node.lastPid
 
     def moveTo( self, hv ):
         "Migrate the VM to the new input hypervisor."
@@ -468,6 +478,9 @@ class VirtualMachine( CMSComponent ):
         assert self.is_running()
         self.hv = None
         self.run_vm_script(script_type="stop")
+        if self.vm_script_pid:
+            self.node.cmd("kill -- -%s" % (self.vm_script_pid,))
+            self.vm_script_pid = None
 
     def remove( self ):
         "Remove traces of the VM from existence."
