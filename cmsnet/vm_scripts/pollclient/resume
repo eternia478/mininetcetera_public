@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd client
+rm is_paused 2> /dev/null

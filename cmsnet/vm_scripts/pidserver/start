@@ -5,4 +5,7 @@ if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
 mkdir server 2> /dev/null
 cd server
 echo "This is a basic file by $NAME." > file.txt
-python -m SimpleHTTPServer
+python -m SimpleHTTPServer &
+
+cd ..
+echo $! > pid

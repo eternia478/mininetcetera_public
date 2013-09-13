@@ -1,0 +1,6 @@
+#!/bin/bash
+
+kill `cat pid` 2> /dev/null
+sleep 1
+kill -9 `cat pid` 2> /dev/null
+rm pid 2> /dev/null

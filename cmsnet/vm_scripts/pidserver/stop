@@ -1,0 +1,11 @@
+#!/bin/bash
+
+cd server
+rm file.txt 2> /dev/null
+cd ..
+rmdir server 2> /dev/null
+
+kill `cat pid` 2> /dev/null
+sleep 1
+kill -9 `cat pid` 2> /dev/null
+rm pid 2> /dev/null

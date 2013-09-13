@@ -1,6 +1,8 @@
 #!/bin/bash
 
 cd client
+rm is_running 2> /dev/null
+rm is_paused 2> /dev/null
 rm file.txt 2> /dev/null
 cd ..
 rmdir client 2> /dev/null

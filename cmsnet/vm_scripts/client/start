@@ -1,11 +1,6 @@
 #!/bin/bash
 
-NAME=$1
-SERVER_IP=$3
-if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
 if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
-if [ ! -d /tmp/$NAME ]; then echo "No such directory /tmp/$NAME."; exit 1; fi
-cd /tmp/$NAME
 
 mkdir client 2> /dev/null
 cd client

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
+
+mkdir client 2> /dev/null
+cd client
+touch is_running
+while [ -f is_running ]
+do
+    while [ -f is_paused ]
+    do
+        sleep 2
+    done
+    wget --no-host-directories --tries=10 $SERVER_IP:8000/file.txt
+    sleep 2
+done

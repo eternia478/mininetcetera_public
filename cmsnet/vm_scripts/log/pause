@@ -1,7 +1,3 @@
 #!/bin/bash
 
-NAME=$1
-if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
-if [ ! -d /tmp/$NAME ]; then echo "No such directory /tmp/$NAME."; exit 1; fi
-
-echo "Pause." >> /tmp/$NAME/state.txt
+echo "Pause." >> state.txt
