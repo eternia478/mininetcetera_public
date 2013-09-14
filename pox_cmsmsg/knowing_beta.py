@@ -131,6 +131,14 @@ class KnowingSwitchBeta (object):
         add_fabric_msg.priority = 0
         add_fabric_msg.actions.append(of.ofp_action_output(port=fabric_port))
         hv_connection.send(add_fabric_msg)
+        
+        # Add exception for flooding
+        add_flood_msg = of.ofp_flow_mod()
+        add_flood_msg.command = of.OFPFC_ADD
+        add_flood_msg.priority = 1
+        add_flood_msg.match.dl_dst = of.EthAddr("ff:ff:ff:ff:ff:ff")
+        add_flood_msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
+        hv_connection.send(add_flood_msg)
 
     # Add entries for sending to VM's
     for vm_info in event.vm_info_list:
