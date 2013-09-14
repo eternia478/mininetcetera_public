@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# dir to store pids
+VARRUN=$HOME/var/run
+
+MONGOD_PID=`cat $VARRUN/mongod.pid`
+
+kill $MONGOD_PID
+
+# Check status
+if [ $? -eq 0 ]; then
+  echo "Mongod killed";
+else
+  echo "FAILED: Stoping MongoDB";
+fi
