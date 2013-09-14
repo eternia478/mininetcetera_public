@@ -577,7 +577,7 @@ class CMSnet( object ):
         except Exception,e:
             warn("\nCannot connect to controller: %s\n" % str(e))
 
-        if self.connection_socket:
+        if self.controller_socket:
             msg = {
               'CHANNEL'      : 'CMS',
               'cmd'          : 'synchronize',
