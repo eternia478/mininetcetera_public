@@ -1,0 +1,14 @@
+#!/bin/bash
+
+VARRUN=$HOME/var/run
+
+REDIS_PID=`cat $VARRUN/redis.pid`
+
+kill $REDIS_PID
+
+# Check status
+if [ $? -eq 0 ]; then
+  echo "Redis server killed";
+else
+  echo "FAILED: Stoping Redis Server";
+fi

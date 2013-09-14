@@ -1,0 +1,24 @@
+#!/bin/bash
+source $HOME/.cmsnetrc
+
+if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+if [ -z "$IP" ]; then echo "SERVER_IP not set."; exit 1; fi
+if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
+
+# dir to store pids
+VARRUN=$HOME/var/run
+mkdir -p $VARRUN
+
+# Redis server configurations
+REDIS_SERVER=/usr/local/bin/redis-server
+PORT=6379
+
+# Starting Redis server
+$REDIS_SERVER --bind $IP --port $PORT --daemonize yes --pidfile $VARRUN/redis.pid
+
+# Check status
+if [ $? -eq 0 ]; then
+	echo "Redis Server $IP:$PORT started"
+else
+  echo "FAILED: Starting Redis Server";
+fi
