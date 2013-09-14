@@ -345,7 +345,7 @@ class VirtualMachine( CMSComponent ):
                 intf_other = intf.link.intf2
             elif intf.link.intf2 == intf:
                 intf_other = intf.link.intf1
-            assert intf_other.node is self.hv
+            assert intf_other.node is self.hv.node
             return intf_other.name
         return None
 
@@ -553,7 +553,7 @@ class Hypervisor( CMSComponent ):
         info = {
           'name'         : self.name,
           'dpid'         : self.dpid,
-          'fabric_ports' : [self.name+"-eth0"],
+          'fabric_ports' : [self.name+"-eth1"],
         }
         return info
 

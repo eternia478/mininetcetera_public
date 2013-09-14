@@ -12,6 +12,7 @@ from pox.core import core
 from pox.messenger import *
 from pox.lib.revent.revent import autoBindEvents
 from pox.core import core as core
+from pox.lib.addresses import EthAddr, IPAddr
 
 log = core.getLogger()
 
@@ -44,8 +45,8 @@ class VMInfo (object):
   def __init__ (self, vm_info_dict):
     assert isinstance(vm_info_dict, dict)
     self.name = vm_info_dict["name"]
-    self.mac_addr = vm_info_dict["mac_addr"]
-    self.ip_addr = vm_info_dict["ip_addr"]
+    self.mac_addr = EthAddr(vm_info_dict["mac_addr"])
+    self.ip_addr = IPAddr(vm_info_dict["ip_addr"])
     self.hv_dpid = vm_info_dict["hv_dpid"]
     self.hv_port_to_vm = vm_info_dict["hv_port_to_vm"]
 
@@ -139,7 +140,7 @@ class CMSBot (ChannelBot, EventMixin):
       log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
       return
     if cmd_type != "unhandled":
-      assert cmd_type in ['instantiate', 'migrate', 'terminate']
+      assert cmd_type in ['instantiate', 'migrate', 'terminate', 'synchronize']
       assert msg.get("cmd") == cmd_type
 
   def _exec_cmd_instantiate (self, event):

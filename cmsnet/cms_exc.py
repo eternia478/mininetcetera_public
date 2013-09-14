@@ -189,7 +189,7 @@ class CMSInvalidChoiceValueError (CMSBaseException):
     arg_name: Relavant argument variable name.
     arg_val: Relavant argument input value.
     """
-    return '%s=%d is not a valid choice.' % (arg_name, arg_val)
+    return '%s=%s is not a valid choice.' % (arg_name, arg_val)
 
 
 

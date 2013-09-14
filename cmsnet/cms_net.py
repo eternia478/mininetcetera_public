@@ -578,12 +578,13 @@ class CMSnet( object ):
             warn("\nCannot connect to controller: %s\n" % str(e))
 
         if self.controller_socket:
+            on_hv = lambda vm: vm.is_running() and not vm.is_paused()
             msg = {
               'CHANNEL'      : 'CMS',
               'cmd'          : 'synchronize',
               #'msg_level'    : self.msg_level,
               'hv_info_list' : [hv.get_info() for hv in self.HVs],
-              'vm_info_list' : [vm.get_info() for vm in self.VMs],
+              'vm_info_list' : [vm.get_info() for vm in self.VMs if on_hv(vm)],
             }
             try:
                 self.controller_socket.send(json.dumps(msg))

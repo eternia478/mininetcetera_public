@@ -30,10 +30,13 @@ class KnowingSwitchBeta (object):
     """
     Temporary measure as a workaround a bug in POX to get correct port number.
     """
-    #return hv_connection.ports[hv_intf_name]
+    #return hv_connection.ports[hv_intf_name].port_no
     is_same_port = lambda p: p.name == hv_intf_name
     all_possible_ports = filter(is_same_port, hv_connection.ports._ports)
-    hv_port = max([p.port_no for p in all_possible_ports])
+    if len(all_possible_ports) > 0:
+       hv_port = max([p.port_no for p in all_possible_ports])
+    else:
+       hv_port = hv_connection.ports[hv_intf_name].port_no
     return hv_port
 
   def _add_new_flow_mod (self, vm_info):
@@ -42,10 +45,10 @@ class KnowingSwitchBeta (object):
     """
     hv_connection = core.openflow.connections[int(vm_info.hv_dpid, 16)]
     hv_port_to_vm = self._get_hv_port_no(vm_info.hv_port_to_vm, hv_connection)
-    #hv_port_to_vm = hv_connection.ports[vm_info.hv_port_to_vm]
+    #hv_port_to_vm = hv_connection.ports[vm_info.hv_port_to_vm].port_no
 
     add_msg = of.ofp_flow_mod()
-    add_msg.command = OFPFC_ADD
+    add_msg.command = of.OFPFC_ADD
     add_msg.match.dl_dst = vm_info.mac_addr
     add_msg.actions.append(of.ofp_action_output(port=hv_port_to_vm))
     hv_connection.send(add_msg)
@@ -57,7 +60,7 @@ class KnowingSwitchBeta (object):
     hv_connection = core.openflow.connections[int(vm_info.hv_dpid, 16)]
 
     del_msg = of.ofp_flow_mod()
-    del_msg.command = OFPFC_DELETE
+    del_msg.command = of.OFPFC_DELETE
     del_msg.match.dl_dst = vm_info.mac_addr
     hv_connection.send(del_msg)
 
@@ -116,22 +119,22 @@ class KnowingSwitchBeta (object):
 
       # Delete previous entries
       del_all_msg = of.ofp_flow_mod()
-      del_all_msg.command = OFPFC_DELETE
+      del_all_msg.command = of.OFPFC_DELETE
       hv_connection.send(del_all_msg)
 
       # Add default entries for sending to fabric
       for fabric_intf_name in hv_info.fabric_ports:
         fabric_port = self._get_hv_port_no(fabric_intf_name, hv_connection)
-        #fabric_port = hv_connection.ports[fabric_intf_name]
+        #fabric_port = hv_connection.ports[fabric_intf_name].port_no
         add_fabric_msg = of.ofp_flow_mod()
-        add_fabric_msg.command = OFPFC_ADD
+        add_fabric_msg.command = of.OFPFC_ADD
         add_fabric_msg.priority = 0
         add_fabric_msg.actions.append(of.ofp_action_output(port=fabric_port))
         hv_connection.send(add_fabric_msg)
 
     # Add entries for sending to VM's
     for vm_info in event.vm_info_list:
-      self._add_new_flow_mod(new_vm_info)
+      self._add_new_flow_mod(vm_info)
 
 
 
@@ -149,9 +152,9 @@ def launch (disable_flood = False):
     error_str += "\n\tpacket = %s" % (event.parsed,)
     error_str += "\n\tswitch_con = %s" % (event.connection,)
     error_str += "\n\tin_port = %s" % (event.port,)
-    error_str += "\n\tin_mac = %s" % (packet.src,)
-    error_str += "\n\tout_mac = %s" % (packet.dst,)
-    log.error(error_str)
+    error_str += "\n\tin_mac = %s" % (event.parsed.src,)
+    error_str += "\n\tout_mac = %s" % (event.parsed.dst,)
+    #log.error(error_str)
   core.openflow.addListenerByName("PacketIn", _handle_PacketIn)
 
   log.info("Knowing switch (beta) running.")
