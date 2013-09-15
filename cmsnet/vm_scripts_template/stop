@@ -1,9 +1,5 @@
 #!/bin/bash
 
-if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
-if [ -z "$IP" ]; then echo "SERVER_IP not set."; exit 1; fi
-if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
-
 cd folder_name
 rm file_name 2> /dev/null
 cd ..

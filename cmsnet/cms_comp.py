@@ -394,7 +394,7 @@ class VirtualMachine( CMSComponent ):
         "Get the bash command to call the VM script with."
         if not self.vm_script:
             return ""
-        assert script_type in ["start", "pause", "resume", "stop"]
+        assert script_type in ["start", "pause", "resume", "stop", "check"]
         script_folder = self._cmsnet_info.get("script_folder")
         if not script_folder:
             script_folder = "."
@@ -404,8 +404,7 @@ class VirtualMachine( CMSComponent ):
         "Get the parameters to run the VM script with."
         default_params = { 'HOME': self.get_temp_folder_path(),
                            'NAME': self.name,
-                           'IP': self.IP,
-                           'SERVER_IP': '127.0.0.1' }
+                           'IP': self.IP, }
         default_params.update(self.vm_script_params)
         return default_params
 
@@ -426,10 +425,18 @@ class VirtualMachine( CMSComponent ):
         "Run the VM script with preset parameters."
         if not self.vm_script:
             return
-        cmd = self.get_vm_script_cmd(script_type=script_type)
         temp_path = self.get_temp_folder_path()
+        check_script_name = self.get_vm_script_cmd(script_type="check")
+        script_name = self.get_vm_script_cmd(script_type=script_type)
         self.write_rc_file()
-        self.node.cmd("cd %s && source .cmsnetrc && %s &" % (temp_path, cmd))
+
+        init_cmd = "cd {0} && source .cmsnetrc && [ -x \"{1}\" ] && {1}"
+        cmd = "{1} >> {0}/log.txt &"
+        err = self.node.cmd(init_cmd.format(temp_path, check_script_name))
+        if not err:
+            self.node.cmd(cmd.format(temp_path, script_name))
+        else:
+            error(err+"\n")
 
     def cloneTo( self, new_vm ):
         "Clone information from this VM to the new VM image."

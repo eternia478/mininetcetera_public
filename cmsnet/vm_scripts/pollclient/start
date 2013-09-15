@@ -1,7 +1,5 @@
 #!/bin/bash
 
-if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
-
 mkdir client 2> /dev/null
 cd client
 touch is_running

@@ -1,9 +1,4 @@
 #!/bin/bash
-source $HOME/.cmsnetrc
-
-if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
-if [ -z "$IP" ]; then echo "SERVER_IP not set."; exit 1; fi
-if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
 
 # dir to store pids
 VARRUN=$HOME/var/run

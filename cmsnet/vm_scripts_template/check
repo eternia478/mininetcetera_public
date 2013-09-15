@@ -1,0 +1,4 @@
+#!/bin/bash
+
+if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+if [ -z "$IP" ]; then echo "IP not set."; exit 1; fi
