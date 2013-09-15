@@ -431,7 +431,7 @@ class VirtualMachine( CMSComponent ):
         self.write_rc_file()
 
         init_cmd = "cd {0} && source .cmsnetrc && [ -x \"{1}\" ] && {1}"
-        cmd = "{1} >> {0}/log.txt &"
+        cmd = "{1} >> {0}/log.out 2>> {0}/log.err &"
         err = self.node.cmd(init_cmd.format(temp_path, check_script_name))
         if not err:
             self.node.cmd(cmd.format(temp_path, script_name))

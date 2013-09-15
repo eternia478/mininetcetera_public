@@ -9,6 +9,6 @@ do
     do
         sleep 2
     done
-    wget --no-host-directories --tries=10 $SERVER_IP:8000/file.txt
+    wget --no-host-directories --tries=10 $SERVER_IP:8000/file.txt -O file.txt
     sleep 2
 done
