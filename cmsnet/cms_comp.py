@@ -415,7 +415,7 @@ class VirtualMachine( CMSComponent ):
         try:
             with open(self.get_temp_folder_path()+"/.cmsnetrc", "w") as f:
                 for arg,val in params.items():
-                    f.write("%s=%s\n" % (arg, val))
+                    f.write("export %s=%s\n" % (arg, val))
                 f.flush()
         except IOError:
             error_msg = "Unable to make rc file for %s." % self.name
