@@ -1,0 +1,32 @@
+#!/bin/bash
+source $HOME/.cmsnetrc
+
+if [ -z "$NAME" ]; then echo "NAME not set."; exit 1; fi
+if [ -z "$IP" ]; then echo "SERVER_IP not set."; exit 1; fi
+if [ -z "$SERVER_IP" ]; then echo "SERVER_IP not set."; exit 1; fi
+
+# dir to store pids
+VARRUN=$HOME/var/run
+
+# Mongo server configurations
+MONGOD=/usr/bin/mongod
+PORT=27017
+MONGO_HOME=$HOME/mongodb
+DBPATH=$MONGO_HOME/dbpath
+LOGPATH=$MONGO_HOME/log
+
+# Make sure that the dirs exisits
+mkdir -p $DBPATH
+mkdir -p $LOGPATH
+mkdir -p $VARRUN
+
+# Starting MongoDB
+echo -e "Starting mongod\n"
+
+$MONGOD --bind_ip=$IP --port $PORT --logpath $LOG_PATH/mongod.log --dbpath $DBPATH --pidfilepath=$VARRUN/mongod.pid
+
+if [ $? -eq 0 ]; then
+  echo "Mongo Server $IP:$PORT started\n";
+else
+  echo "FAILED: Starting MongoDB";
+fi
