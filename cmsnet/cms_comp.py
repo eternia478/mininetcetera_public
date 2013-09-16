@@ -174,6 +174,8 @@ class CMSComponent( object ):
         try:
             config, l = defaultDecoder.raw_decode(config_raw)
             assert isinstance(config, dict), "Config not a dictionary."
+            if config.pop('NAME', self.name) != self.name:
+                warn("\nVM %s name changed?\n" % (self.name,))
             for attr in config:
                 if isinstance(config[attr], basestring):
                     setattr(self, attr, str(config[attr]))
@@ -191,6 +193,7 @@ class CMSComponent( object ):
 
         # Part 1: Get config data and dump to string
         config = {}
+        config['NAME'] = self.name
         config_raw = None
         try:
             self.set_comp_config(config)
