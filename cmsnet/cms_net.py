@@ -584,22 +584,34 @@ class CMSnet( object ):
         try:
             sock = socket.create_connection((ip, port))
             self.controller_socket = sock
+            self.send_sync(try_reconnect = False)
         except Exception,e:
             warn("\nCannot connect to CMS controller at %s.%s: %s\n" % (ip, port, e))
 
-        if self.controller_socket:
-            on_hv = lambda vm: vm.is_running() and not vm.is_paused()
-            msg = {
-              'CHANNEL'      : 'CMS',
-              'cmd'          : 'synchronize',
-              #'msg_level'    : self.msg_level,
-              'hv_info_list' : [hv.get_info() for hv in self.HVs],
-              'vm_info_list' : [vm.get_info() for vm in self.VMs if on_hv(vm)],
-            }
-            try:
-                self.controller_socket.send(json.dumps(msg))
-            except Exception,e:
-                warn("\nCannot send to controller: %s\n" % str(e))
+    def send_sync ( self, try_reconnect = True ):
+        if not self.controller_socket:
+            if try_reconnect:
+              info("Attempting to reconnect\n")
+              self.setup_controller_connection()
+            return
+
+        on_hv = lambda vm: vm.is_running() and not vm.is_paused()
+        msg = {
+          'CHANNEL'      : 'CMS',
+          'cmd'          : 'synchronize',
+          #'msg_level'    : self.msg_level,
+          'hv_info_list' : [hv.get_info() for hv in self.HVs],
+          'vm_info_list' : [vm.get_info() for vm in self.VMs if on_hv(vm)],
+        }
+        try:
+            self.controller_socket.send(json.dumps(msg))
+            info("Sync sent\n")
+        except Exception,e:
+            warn("Cannot send to controller: %s\n" % str(e))
+            self.close_controller_connection()
+            if try_reconnect:
+                self.setup_controller_connection()
+
 
     def close_controller_connection( self ):
         "Close the connection to the controller."
@@ -627,6 +639,8 @@ class CMSnet( object ):
                 self.controller_socket.send(json.dumps(msg))
             except Exception,e:
                 warn("\nCannot send to controller: %s\n" % str(e))
+                self.close_controller_connection()
+                self.setup_controller_connection()
 
     def makeTerms( self, comp, term='xterm' ):
         "Spawn terminals for the given component."
