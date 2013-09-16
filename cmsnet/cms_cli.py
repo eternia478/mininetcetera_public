@@ -958,6 +958,8 @@ class CMSCLI( Cmd ):
     def do_unpause( self, line ):
         self.do_resume(line, cmd_name='unpause')
 
+    def do_sync( self, line ):
+        self.cn.send_sync()
 
 
 
