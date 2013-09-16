@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Starts cmsnet
+# Puts configs in the cmsnet folder
+
+# Next snippet from stackoverflow
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  TARGET="$(readlink "$SOURCE")"
+  if [[ $SOURCE == /* ]]; then
+#    echo "SOURCE '$SOURCE' is an absolute symlink to '$TARGET'"
+    SOURCE="$TARGET"
+  else
+    DIR="$( dirname "$SOURCE" )"
+#    echo "SOURCE '$SOURCE' is a relative symlink to '$TARGET' (relative to '$DIR')"
+    SOURCE="$DIR/$TARGET" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+  fi
+done
+#echo "SOURCE is '$SOURCE'"
+RDIR="$( dirname "$SOURCE" )"
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )" #&& echo x)"
+#DIR="${DIR%x}"
+#if [ "$DIR" != "$RDIR" ]; then
+#  echo "DIR '$RDIR' resolves to '$DIR'"
+#fi
+#echo "DIR is '$DIR'"
+
+MININET_PATH=$DIR/..
+PYTHONPATH=$MININET_PATH:$PYTHONPATH
+POX_CORE_DIR=$HOME/pox/
+CONFIG_FOLDER_LOCATION=$MININET_PATH
+
+cd $CONFIG_FOLDER_LOCATION
+mkdir config 2> /dev/null
+cd config
+
+#echo "PYTHONPATH=$PYTHONPATH POX_CORE_DIR=$POX_CORE_DIR $MININET_PATH/bin/cms $@"
+sudo env PYTHONPATH=$PYTHONPATH POX_CORE_DIR=$POX_CORE_DIR $MININET_PATH/bin/cms $@
