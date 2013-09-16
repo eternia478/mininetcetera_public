@@ -126,7 +126,7 @@ VERSION = "2.1.0.i.x.beta"
 
 
 def jsondumps (v):
-    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : '))
+    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : ')) + '\n'
 
 
 class CMSnet( object ):

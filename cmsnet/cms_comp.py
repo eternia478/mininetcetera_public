@@ -35,7 +35,7 @@ defaultDecoder = json.JSONDecoder()
 
 
 def jsondumps (v):
-    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : '))
+    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : ')) + '\n'
 
 
 class CMSComponent( object ):
