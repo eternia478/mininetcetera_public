@@ -124,6 +124,11 @@ import cmsnet.mininet_net_patch
 # Mininet version: should be consistent with README and LICENSE
 VERSION = "2.1.0.i.x.beta"
 
+
+def jsondumps (v):
+    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : '))
+
+
 class CMSnet( object ):
     "Network emulation with hosts spawned in network namespaces."
 
@@ -411,7 +416,7 @@ class CMSnet( object ):
         config_raw = None
         try:
             self.set_net_config(config)
-            config_raw = json.dumps(config)
+            config_raw = jsondumps(config)
         except:
             error_msg = "Config for CMSnet cannot be created."
             config_error(error_msg, config=config)

@@ -34,6 +34,10 @@ import json
 defaultDecoder = json.JSONDecoder()
 
 
+def jsondumps (v):
+    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : '))
+
+
 class CMSComponent( object ):
     """A component of the cloud network. This is simply a wrapper for Node
        objects in Mininet."""
@@ -190,7 +194,7 @@ class CMSComponent( object ):
         config_raw = None
         try:
             self.set_comp_config(config)
-            config_raw = json.dumps(config)
+            config_raw = jsondumps(config)
         except:
             error_msg = "Config for %s cannot be created." % self.name
             config_error(error_msg, config=config)
