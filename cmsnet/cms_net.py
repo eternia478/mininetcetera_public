@@ -376,10 +376,15 @@ class CMSnet( object ):
                     pass
                 elif attr.endswith("cls_name"):
                     pass
-                elif isinstance(config[attr], basestring):
-                    setattr(self, attr, str(config[attr]))
                 else:
-                    setattr(self, attr, config[attr])
+                    val = config[attr]
+                    if isinstance(config[attr], basestring):
+                        val = str(val) # Undo unicode
+                    if hasattr(self, attr):
+                        if getattr(self, attr) != val:
+                            warn("\nConfig file overriding %s\n" % (attr,))
+
+                    setattr(self, attr, val)
 
             net_cls_name = config.get("net_cls_name")
             vm_cls_name = config.get("vm_cls_name")
