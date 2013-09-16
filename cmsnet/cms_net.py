@@ -580,7 +580,7 @@ class CMSnet( object ):
             sock = socket.create_connection((ip, port))
             self.controller_socket = sock
         except Exception,e:
-            warn("\nCannot connect to controller: %s\n" % str(e))
+            warn("\nCannot connect to CMS controller at %s.%s: %s\n" % (ip, port, e))
 
         if self.controller_socket:
             on_hv = lambda vm: vm.is_running() and not vm.is_paused()
