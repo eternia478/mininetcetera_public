@@ -6,9 +6,6 @@ A super simple knowing switch. Beta version.
 from pox.core import core
 import pox.openflow.libopenflow_01 as of
 
-# This import is specifically for this controller's functionality.
-from pox.messenger import cmsnet_service
-
 # Even a simple usage of the logger is much nicer than print!
 log = core.getLogger()
 
@@ -147,22 +144,22 @@ class KnowingSwitchBeta (object):
 
 
 def launch (disable_flood = False):
-  if not cmsnet_service.cmsbot:
-    log.warn("Didn't start CMSnet messenging service.")
-    cmsnet_service.launch()
+  def start ():
+    ctl = KnowingSwitchBeta()
+    core.cmsbot.addListeners(ctl)
 
-  ctl = KnowingSwitchBeta()
-  cmsnet_service.cmsbot.addListeners(ctl)
+    # Handle messages the switch has sent us because it has no matching rule.
+    def _handle_PacketIn (event):
+      error_str = "Unexpected PacketIn:"
+      error_str += "\n\tpacket = %s" % (event.parsed,)
+      error_str += "\n\tswitch_con = %s" % (event.connection,)
+      error_str += "\n\tin_port = %s" % (event.port,)
+      error_str += "\n\tin_mac = %s" % (event.parsed.src,)
+      error_str += "\n\tout_mac = %s" % (event.parsed.dst,)
+      log.debug(error_str)
+      #log.error(error_str)
+    core.openflow.addListenerByName("PacketIn", _handle_PacketIn)
 
-  # Handle messages the switch has sent us because it has no matching rule.
-  def _handle_PacketIn (event):
-    error_str = "This shouldn't be the case: "
-    error_str += "\n\tpacket = %s" % (event.parsed,)
-    error_str += "\n\tswitch_con = %s" % (event.connection,)
-    error_str += "\n\tin_port = %s" % (event.port,)
-    error_str += "\n\tin_mac = %s" % (event.parsed.src,)
-    error_str += "\n\tout_mac = %s" % (event.parsed.dst,)
-    #log.error(error_str)
-  core.openflow.addListenerByName("PacketIn", _handle_PacketIn)
+    log.info("Knowing switch running.")
 
-  log.info("Knowing switch (beta) running.")
+  core.call_when_ready(start, "cmsbot")

@@ -184,13 +184,12 @@ class CMSBot (ChannelBot, EventMixin):
     log.warn("Invalid cmd type %s for CMS message!" % (msg.get("cmd"),))
 
 
-cmsbot = None
 
 
 def launch (nexus = "MessengerNexus"):
   def start (nexus):
-    global cmsbot
     real_nexus = core.components[nexus]
     cmsbot = CMSBot(real_nexus.get_channel('CMS'))
+    core.register('cmsbot', cmsbot)
 
   core.call_when_ready(start, nexus, args=[nexus])
