@@ -112,7 +112,10 @@ class KnowingSwitchBeta (object):
       self.vm_info_table[vm_info.name] = vm_info
 
     for hv_info in event.hv_info_list:
-      hv_connection = core.openflow.connections[int(hv_info.dpid, 16)]
+      hv_connection = core.openflow.connections.get(int(hv_info.dpid, 16))
+      if hv_connection is None:
+        log.warn("Can't sync disconnected switch %s", hv_info.dpid)
+        continue
 
       # Delete previous entries
       del_all_msg = of.ofp_flow_mod()
