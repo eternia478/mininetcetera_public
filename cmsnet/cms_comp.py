@@ -519,7 +519,9 @@ class Hypervisor( CMSComponent ):
         cmsnet_info: Dictionary of necessary information from CMSnet
         vm_dist_limit: Hypervisor's personal VM capacity limit
         """
-        assert isinstance(node, Switch)
+        assert isinstance(node, Switch) or "Switch" in type(node).__name__
+        # That's a big old hack, but what really IS a switch?
+
         CMSComponent.__init__( self, node, cmsnet_info )
 
         self.nameToVMs = {}   # UNUSED: mapping for VMs in this hypervisor
