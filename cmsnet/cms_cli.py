@@ -209,7 +209,7 @@ class CMSCLI( Cmd ):
         """
         vm_script = vm_kwargs.get("vm_script")
         vm_cls = vm_kwargs.get("vm_cls")
-        err = True
+        err = False
 
         if vm_script:
             if vm_script not in self.cn.possible_scripts:
