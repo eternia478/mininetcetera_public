@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# dir to store pids
+VARRUN=$HOME/var/run
+mkdir -p $VARRUN
+
+# Redis server configurations
+AUTH_SERVICE=$PYTHONPATH/cmsnet/vm_scripts/auth_service/auth_service.py
+PORT=8080
+
+# checking the auth service script exists
+if [[ ! -x "$AUTH_SERVICE" ]]
+then
+	echo "$AUTH_SERVICE doesn't exist or it's not executable"
+	exit 1;
+fi
+
+# Starting auth service
+$AUTH_SERVICE $IP $PORT $REDIS_SERVER_IP $REDIS_SERVER_PORT &
+
+# Check status
+if [ $? -eq 0 ]; then
+	echo "Auth Service $IP:$PORT started"
+else
+  echo "FAILED: Starting auth service";
+fi
+
+# Store the service PID
+pid=$!
+echo $! > $VARRUN/auth_service.pid

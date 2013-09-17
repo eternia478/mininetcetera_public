@@ -1,0 +1,14 @@
+#!/bin/bash
+
+VARRUN=$HOME/var/run
+
+AUTH_SERVICE_PID=`cat $VARRUN/auth_service.pid`
+
+kill $AUTH_SERVICE_PID
+
+# Check status
+if [ $? -eq 0 ]; then
+  echo "Auth service killed";
+else
+  echo "FAILED: Stoping auth service";
+fi
