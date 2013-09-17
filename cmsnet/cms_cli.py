@@ -501,17 +501,27 @@ class CMSCLI( Cmd ):
         if not err:
             self.cn.deleteVM(vm)
 
+    def do_show( self, line, cmd_name='running' ):
+        "Show VM"
+        args = line.split()
+        vm_name = None
 
+        if len(args) == 1:
+            vm_name = args[0]
 
+        l = []
+        for vm in self.cn.VMs:
+          if vm_name is not None:
+            if vm.name != vm_name:
+              continue
 
+          port = "%s.%s" % (vm.hv_dpid,vm.hv_port_to_vm)
+          if port == "None.None": port = "<Not Running>"
+          l.append( (vm.name, vm.IP, vm.MAC, port) )
 
-
-
-
-
-
-
-
+        l.sort()
+        for vminfo in l:
+          print "%-10s %-14s %-17s %s" % vminfo
 
 
 
