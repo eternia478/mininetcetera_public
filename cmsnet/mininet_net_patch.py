@@ -66,7 +66,7 @@ class MininetPatch(Mininet):
         if self.cleanup:
             pass
 
-        info( '*** Creating network\n' )
+        info( '*** Creating %s topology network\n' % (type(topo).__name__,) )
 
         #---------------------------------------------THIS NEEDS TO BE ADDED!
         if not self.dummies:
