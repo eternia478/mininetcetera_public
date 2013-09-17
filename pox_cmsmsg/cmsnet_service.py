@@ -135,7 +135,7 @@ class CMSBot (ChannelBot, EventMixin):
     """
     Check the values stored in the message sent on the CMS channel.
     """
-    log.debug("Received %s CMS message: %s" % (cmd_type, msg))
+    #log.debug("Received %s CMS message: %s" % (cmd_type, msg))
     if msg.get("CHANNEL") != 'CMS':
       log.warn("Not correct channel: %s" % msg.get("CHANNEL"))
       return
