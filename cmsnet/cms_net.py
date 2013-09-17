@@ -124,6 +124,11 @@ import cmsnet.mininet_net_patch
 # Mininet version: should be consistent with README and LICENSE
 VERSION = "2.1.0.i.x.beta"
 
+import threading
+
+# Lock for messing with CMS control channel
+cms_channel_lock = threading.RLock()
+
 
 def jsondumps (v):
     return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : ')) + '\n'
@@ -149,6 +154,9 @@ class CMSnet( object ):
            controller_ip = IP to connect to for the controller socket.
            controller_port = Port to connect to for the controller socket.
            params: extra paramters for Mininet"""
+
+        self.echo_timer = None # Timer that sends echo over CMS channel
+
         self._allow_write_net_config = False
         self.cmsnet_info = {}
 
@@ -191,6 +199,7 @@ class CMSnet( object ):
         self.mn = self.net_cls(**params)
         self.update_net_config()
         self.unlock_net_config()
+
 
     # BL: We now have four ways to look up components
     # This may (should?) be cleaned up in the future.
@@ -299,9 +308,16 @@ class CMSnet( object ):
                 sys.exit(1)
         self.setup_controller_connection()
         self.unlock_net_config()
+        self.set_echo_timer()
+
+    def set_echo_timer( self ):
+        self.echo_timer = threading.Timer(3, self.controller_channel_keepalive)
+        self.echo_timer.start()
 
     def stop( self ):
         "Stop Mininet, VMs, and the connection to the controller."
+        if self.echo_timer:
+            self.echo_timer.cancel()
         self.lock_net_config()
         self.close_controller_connection()
         info( '*** Stopping %i VMs\n' % len( self.VMs ) )
@@ -576,64 +592,18 @@ class CMSnet( object ):
         self.mn.debug_flag1 = orig_mn_debug_flag1
         return err
 
-    def setup_controller_connection( self ):
-        "Start the connection to the controller."
-        # Change self.controller_socket from None to the actual socket.
-        ip = self.controller_ip
-        port = self.controller_port
-        try:
-            sock = socket.create_connection((ip, port))
-            self.controller_socket = sock
-            self.send_sync(try_reconnect = False)
-        except Exception,e:
-            warn("\nCannot connect to CMS controller at %s.%s: %s\n" % (ip, port, e))
+    def controller_channel_keepalive( self ):
+        with cms_channel_lock:
+            self.set_echo_timer() # Do this again later
 
-    def send_sync ( self, try_reconnect = True ):
-        if not self.controller_socket:
-            if try_reconnect:
-              info("Attempting to reconnect\n")
-              self.setup_controller_connection()
-            return
+            if not self.controller_socket:
+                self.setup_controller_connection(quiet = True)
+                return
 
-        on_hv = lambda vm: vm.is_running() and not vm.is_paused()
-        msg = {
-          'CHANNEL'      : 'CMS',
-          'cmd'          : 'synchronize',
-          #'msg_level'    : self.msg_level,
-          'hv_info_list' : [hv.get_info() for hv in self.HVs],
-          'vm_info_list' : [vm.get_info() for vm in self.VMs if on_hv(vm)],
-        }
-        try:
-            self.controller_socket.send(json.dumps(msg))
-            info("Sync sent\n")
-        except Exception,e:
-            warn("Cannot send to controller: %s\n" % str(e))
-            self.close_controller_connection()
-            if try_reconnect:
-                self.setup_controller_connection()
-
-
-    def close_controller_connection( self ):
-        "Close the connection to the controller."
-        if self.controller_socket:
-            try:
-                self.controller_socket.shutdown(socket.SHUT_RDWR)
-            except:
-                pass  # If other side already shut down, leave it.
-            self.controller_socket.close()
-            self.controller_socket = None
-
-    def send_msg_to_controller( self, cmd_type, vm, old_vm_info ):
-        "Send a CMS message to the controller."
-        assert cmd_type in ['instantiate', 'migrate', 'terminate']
-        assert old_vm_info.get("name") == vm.name
-        if self.controller_socket:
             msg = {
               'CHANNEL'     : 'CMS',
-              'cmd'         : cmd_type,
-              #'msg_level'   : self.msg_level,
-              'new_vm_info' : vm.get_info(),
-              'old_vm_info' : old_vm_info,
+              'cmd'         : 'echorequest',
+              'data'        : 'ping',
             }
             try:
                 self.controller_socket.send(json.dumps(msg))
@@ -641,6 +611,78 @@ class CMSnet( object ):
                 warn("\nCannot send to controller: %s\n" % str(e))
                 self.close_controller_connection()
                 self.setup_controller_connection()
+
+    def setup_controller_connection( self, quiet = False ):
+        "Start the connection to the controller."
+        with cms_channel_lock:
+            # Change self.controller_socket from None to the actual socket.
+            ip = self.controller_ip
+            port = self.controller_port
+            try:
+                sock = socket.create_connection((ip, port))
+                self.controller_socket = sock
+                self.send_sync(try_reconnect = False)
+            except Exception,e:
+                if not quiet:
+                    warn("\nCannot connect to CMS controller at %s.%s: %s\n" % (ip, port, e))
+
+    def send_sync ( self, try_reconnect = True ):
+        with cms_channel_lock:
+            if not self.controller_socket:
+                if try_reconnect:
+                  info("Attempting to reconnect\n")
+                  self.setup_controller_connection()
+                return
+
+            on_hv = lambda vm: vm.is_running() and not vm.is_paused()
+            msg = {
+              'CHANNEL'      : 'CMS',
+              'cmd'          : 'synchronize',
+              #'msg_level'    : self.msg_level,
+              'hv_info_list' : [hv.get_info() for hv in self.HVs],
+              'vm_info_list' : [vm.get_info() for vm in self.VMs if on_hv(vm)],
+            }
+            try:
+                self.controller_socket.send(json.dumps(msg))
+                info("Sync sent\n")
+            except Exception,e:
+                warn("Cannot send to controller: %s\n" % str(e))
+                self.close_controller_connection()
+                if try_reconnect:
+                    self.setup_controller_connection()
+
+
+    def close_controller_connection( self ):
+        "Close the connection to the controller."
+        with cms_channel_lock:
+            if self.controller_socket:
+                try:
+                    self.controller_socket.shutdown(socket.SHUT_RDWR)
+                except:
+                    pass  # If other side already shut down, leave it.
+                self.controller_socket.close()
+                self.controller_socket = None
+
+    def send_msg_to_controller( self, cmd_type, vm, old_vm_info ):
+        "Send a CMS message to the controller."
+        #TODO: Refactor this so we can send a generic message with it (like the sync)
+        with cms_channel_lock:
+            assert cmd_type in ['instantiate', 'migrate', 'terminate']
+            assert old_vm_info.get("name") == vm.name
+            if self.controller_socket:
+                msg = {
+                  'CHANNEL'     : 'CMS',
+                  'cmd'         : cmd_type,
+                  #'msg_level'   : self.msg_level,
+                  'new_vm_info' : vm.get_info(),
+                  'old_vm_info' : old_vm_info,
+                }
+                try:
+                    self.controller_socket.send(json.dumps(msg))
+                except Exception,e:
+                    warn("\nCannot send to controller: %s\n" % str(e))
+                    self.close_controller_connection()
+                    self.setup_controller_connection()
 
     def makeTerms( self, comp, term='xterm' ):
         "Spawn terminals for the given component."
