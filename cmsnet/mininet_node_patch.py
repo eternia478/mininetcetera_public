@@ -94,11 +94,12 @@ class POXSwitch( Switch ):
         if self.print_personal_debug: print ps
 
         if 'POX_CORE_DIR' not in os.environ:
-            #exit( 'exiting; please set missing POX_CORE_DIR env var' )
-            self.poxCoreDir = "/home/mininet/pox"
-            warn("POX_CORE_DIR is not set.")
+            self.poxCoreDir = os.path.join(os.path.expanduser("~"), "pox")
+            warn("POX_CORE_DIR is not set; using " + self.poxCoreDir)
         else:
             self.poxCoreDir = os.environ[ 'POX_CORE_DIR' ]
+        if not os.path.isdir(self.poxCoreDir):
+            exit( 'exiting; please set missing POX_CORE_DIR env var' )
 
         self.use_remote_controller = (not control_flag)
         self.controller_type = control_type
