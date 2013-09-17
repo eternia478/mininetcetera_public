@@ -1,0 +1,2 @@
+#!/bin/bash
+rmdir /sys/fs/cgroup/mininet/$1
