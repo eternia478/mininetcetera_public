@@ -175,6 +175,12 @@ class CMSBot (ChannelBot, EventMixin):
     self._check_msg(msg, "synchronize")
     self.raiseEvent(CMSSynchronize(msg))
 
+  def _exec_cmd_echorequest (self, event):
+    """
+    Handle an echo request
+    """
+    self.reply(cmd='echoreply', data=event.get('data'))
+
   def _unhandled (self, event):
     """
     Unhandled cmd type.
