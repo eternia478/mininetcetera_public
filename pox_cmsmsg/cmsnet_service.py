@@ -179,7 +179,7 @@ class CMSBot (ChannelBot, EventMixin):
     """
     Handle an echo request
     """
-    self.reply(cmd='echoreply', data=event.get('data'))
+    self.reply(event, cmd='echoreply', data=event.msg.get('data'))
 
   def _unhandled (self, event):
     """
