@@ -42,7 +42,8 @@ from cmsnet.cms_comp import VirtualMachine, Hypervisor
 from cmsnet.cms_topo import CMSLinearTopo, CMSHubAndSpokeTopo
 from cmsnet.mininet_clean_patch import cleanup
 from cmsnet.mininet_net_patch import MininetPatch
-from cmsnet.mininet_node_patch import POXSwitch, POXNormalSwitch, Dummy
+from cmsnet.mininet_node_patch import POXSwitch, POXNormalSwitch, POXNGSwitch
+from cmsnet.mininet_node_patch import Dummy, PlainSwitch
 
 
 import subprocess
@@ -106,6 +107,8 @@ SWITCHES = { 'user': UserSwitch,
              'ovsl': OVSLegacyKernelSwitch,
              'ivs': IVSSwitch,
              'pox': POXSwitch,
+             'plain' : PlainSwitch,
+             'ng' : POXNGSwitch,
              'normal': POXNormalSwitch }
 
 HOSTDEF = 'proc'
