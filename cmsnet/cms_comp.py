@@ -24,6 +24,7 @@ from time import sleep
 from mininet.log import info, error, warn, debug
 from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
                            numCores, retry, mountCgroups )
+from mininet.util import macColonHex, ipStr, ipNum, ipAdd, ipParse, netParse
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
 from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
@@ -312,12 +313,16 @@ class VirtualMachine( CMSComponent ):
         self.update_comp_config()
 
     @property
+    def prefixLen( self ):
+        return self.node.intf().prefixLen
+
+    @property
     def netmask( self ):
-        return self.node.params.get('netmask')
+        return ipStr(int("1"*(32-self.prefixLen) + "0"*self.prefixLen, 2))
 
     @netmask.setter
     def netmask( self, netmask ):
-        self.node.params['netmask'] = netmask
+        self.node.intf().prefixLen = 32 - bin(ipParse(netmask)).count('1')
         self.update_comp_config()
 
     @property
