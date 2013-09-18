@@ -294,14 +294,63 @@ class VirtualMachine( CMSComponent ):
     def tenant_id( self ):
         return self._tenant_id
 
+    def macParse( mac ):
+        return int(mac.replace(":",""), 16)
+
+    def isValidMAC( self, macstr ):
+        try:
+            macval = self.macParse(macstr)
+            return macstr == macColonHex(macval)
+        except:
+            return False
+
     @property
     def MAC( self ):
         return self.node.MAC()
 
     @MAC.setter
     def MAC( self, mac ):
+        if not self.isValidMAC(mac):
+            error("Is not a valid MAC address: %s\n" % (mac,))
+            return
         self.node.setMAC(mac)
         self.update_comp_config()
+
+    def isValidIP( self, ipstr ):
+        try:
+            ip = ipstr
+            if '/' in ipstr:
+                ip, pf = ipstr.split( '/' )
+                prefixLen = int( pf )
+            args = [ int( arg ) for arg in ip.split( '.' ) ]
+            ipNum( *args )
+            return all([ arg in xrange(256) for arg in args ])
+        except:
+            return False
+
+    def bitSum( self, num ):
+        return bin(num).count('1')
+
+    def getNetmaskFromPrefixLen( self, prefixLen ):
+        mask_binrepr = "1"*(32 - prefixLen) + "0"*(prefixLen)
+        return ipStr(int(mask_binrepr, 2))
+
+    def getPrefixLenFromNetmask( self, netmask ):
+        assert self.isValidIP(netmask) and '/' not in netmask
+        return 32 - self.bitSum(ipParse(netmask))
+
+    def isValidNetmask( self, netmask ):
+        assert self.isValidIP(netmask) and '/' not in netmask
+        prefixLen = self.getPrefixLenFromNetmask(netmask)
+        return netmask == self.getNetmaskFromPrefixLen(prefixLen)
+
+    def isInSameSubnet( self, ip1, ip2, netmask ):
+        assert self.isValidIP(ip1) and '/' not in ip1
+        assert self.isValidIP(ip2) and '/' not in ip2
+        assert self.isValidIP(netmask) and '/' not in netmask
+        assert self.isValidNetmask(netmask)
+        mask = ipParse(netmask)
+        return mask & ipParse(ip1) == mask & ipParse(ip2)
 
     @property
     def IP( self ):
@@ -309,21 +358,47 @@ class VirtualMachine( CMSComponent ):
 
     @IP.setter
     def IP( self, ip ):
-        self.node.setIP(ip)
+        if not self.isValidIP(ip):
+            error("Is not a valid IPv4 address: %s\n" % (ip,))
+            return
+        prefixLen = self.prefixLen
+        if '/' in ip:
+            ip, prefixLen = netParse(ip)
+        self.node.setIP(ip, prefixLen=prefixLen)
+        if self.default_gateway:
+            if not self.isInSameSubnet(self.default_gateway, ip, self.netmask):
+                warn("Gateway not in same subnet anymore.\n")
         self.update_comp_config()
 
     @property
     def prefixLen( self ):
-        return self.node.intf().prefixLen
+        return int(self.node.intf().prefixLen)
+
+    @prefixLen.setter
+    def prefixLen( self, prefixLen ):
+        self.IP = self.IP + "/" + prefixLen
+        #self.node.setIP(self.IP, prefixLen=prefixLen)
+        #self.update_comp_config()
 
     @property
     def netmask( self ):
-        return ipStr(int("1"*(32-self.prefixLen) + "0"*self.prefixLen, 2))
+        return self.getNetmaskFromPrefixLen(self.prefixLen)
 
     @netmask.setter
     def netmask( self, netmask ):
-        self.node.intf().prefixLen = 32 - bin(ipParse(netmask)).count('1')
-        self.update_comp_config()
+        if not self.isValidIP(netmask):
+            error("Is not a valid IPv4 address: %s\n" % (netmask,))
+            return
+        if '/' in ip:
+            error("Netmask should not set prefix length: %s\n" % (netmask,))
+            return
+        if not self.isValidNetmask(netmask):
+            error("Is not a valid netmask address: %s\n" % (netmask,))
+            return
+        self.prefixLen = self.getPrefixLenFromNetmask(netmask)
+        #prefixLen = self.getPrefixLenFromNetmask(netmask)
+        #self.node.setIP(self.IP, prefixLen=prefixLen)
+        #self.update_comp_config()
 
     @property
     def default_gateway( self ):
@@ -331,6 +406,14 @@ class VirtualMachine( CMSComponent ):
 
     @default_gateway.setter
     def default_gateway( self, default_gateway ):
+        if not self.isValidIP(default_gateway):
+            error("Is not a valid IPv4 address: %s\n" % (default_gateway,))
+            return
+        if '/' in ip:
+            error("Gateway should not set prefix: %s\n" % (default_gateway,))
+            return
+        if not self.isInSameSubnet(default_gateway, self.IP, self.netmask):
+            warn("Gateway not in same subnet: %s\n" % (default_gateway,))
         self.node.params['default_gateway'] = default_gateway
         self.update_comp_config()
 
