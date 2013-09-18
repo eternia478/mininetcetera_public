@@ -294,6 +294,15 @@ class VirtualMachine( CMSComponent ):
         return self._tenant_id
 
     @property
+    def MAC( self ):
+        return self.node.MAC()
+
+    @MAC.setter
+    def MAC( self, mac ):
+        self.node.setMAC(mac)
+        self.update_comp_config()
+
+    @property
     def IP( self ):
         return self.node.IP()
 
@@ -303,12 +312,21 @@ class VirtualMachine( CMSComponent ):
         self.update_comp_config()
 
     @property
-    def MAC( self ):
-        return self.node.MAC()
+    def netmask( self ):
+        return self.node.params.get('netmask')
 
-    @MAC.setter
-    def MAC( self, mac ):
-        self.node.setMAC(mac)
+    @netmask.setter
+    def netmask( self, netmask ):
+        self.node.params['netmask'] = netmask
+        self.update_comp_config()
+
+    @property
+    def default_gateway( self ):
+        return self.node.params.get('default_gateway')
+
+    @default_gateway.setter
+    def default_gateway( self, default_gateway ):
+        self.node.params['default_gateway'] = default_gateway
         self.update_comp_config()
 
     @property
@@ -364,11 +382,13 @@ class VirtualMachine( CMSComponent ):
     def get_info( self ):
         "Get information to be sent with a CMS message to the controller."
         info = {
-          'name'          : self.name,
-          'mac_addr'      : self.MAC,
-          'ip_addr'       : self.IP,
-          'hv_dpid'       : self.hv_dpid,
-          'hv_port_to_vm' : self.hv_port_to_vm,
+          'name'            : self.name,
+          'mac_addr'        : self.MAC,
+          'ip_addr'         : self.IP,
+          'netmask'         : self.netmask,
+          'default_gateway' : self.default_gateway,
+          'hv_dpid'         : self.hv_dpid,
+          'hv_port_to_vm'   : self.hv_port_to_vm,
         }
         return info
 
@@ -384,8 +404,10 @@ class VirtualMachine( CMSComponent ):
         config["vm_script"] = self.vm_script
         config["vm_script_params"] = self.vm_script_params
         config["_tenant_id"] = self._tenant_id
-        config["IP"] = self.IP
         config["MAC"] = self.MAC
+        config["IP"] = self.IP
+        config["netmask"] = self.netmask
+        config["default_gateway"] = self.default_gateway
         config["config_hv_name"] = self.hv_name
         config["config_is_paused"] = self.is_paused()
 
@@ -409,9 +431,14 @@ class VirtualMachine( CMSComponent ):
 
     def get_vm_script_params( self ):
         "Get the parameters to run the VM script with."
-        default_params = { 'HOME': self.get_temp_folder_path(),
-                           'NAME': self.name,
-                           'IP': self.IP, }
+        default_params = { 
+          'HOME'            : self.get_temp_folder_path(),
+          'NAME'            : self.name,
+          'MAC'             : self.MAC,
+          'IP'              : self.IP,
+          'NETMASK'         : self.netmask,
+          'DEFAULT_GATEWAY' : self.default_gateway, 
+        }
         default_params.update(self.vm_script_params)
         return default_params
 
