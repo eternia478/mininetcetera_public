@@ -31,13 +31,10 @@ from mininet.node import Node, Host, Switch
 
 from cmsnet.cms_log import config_error
 import shutil
-import json
-defaultDecoder = json.JSONDecoder()
-
-
-def jsondumps (v):
-    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : ')) + '\n'
-
+from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps, isValidMAC,
+                              isValidIP, isValidNetmask, isInSameSubnet,
+                              getNetmaskFromPrefixLen, getPrefixLenFromNetmask,
+                              UpdatingDict, ConfigUpdatingDict )
 
 class CMSComponent( object ):
     """A component of the cloud network. This is simply a wrapper for Node
@@ -198,7 +195,7 @@ class CMSComponent( object ):
         config_raw = None
         try:
             self.set_comp_config(config)
-            config_raw = jsondumps(config)
+            config_raw = jsonprint(config)
         except:
             error_msg = "Config for %s cannot be created." % self.name
             config_error(error_msg, config=config)
@@ -294,63 +291,17 @@ class VirtualMachine( CMSComponent ):
     def tenant_id( self ):
         return self._tenant_id
 
-    def macParse( mac ):
-        return int(mac.replace(":",""), 16)
-
-    def isValidMAC( self, macstr ):
-        try:
-            macval = self.macParse(macstr)
-            return macstr == macColonHex(macval)
-        except:
-            return False
-
     @property
     def MAC( self ):
         return self.node.MAC()
 
     @MAC.setter
     def MAC( self, mac ):
-        if not self.isValidMAC(mac):
+        if not isValidMAC(mac):
             error("Is not a valid MAC address: %s\n" % (mac,))
             return
         self.node.setMAC(mac)
         self.update_comp_config()
-
-    def isValidIP( self, ipstr ):
-        try:
-            ip = ipstr
-            if '/' in ipstr:
-                ip, pf = ipstr.split( '/' )
-                prefixLen = int( pf )
-            args = [ int( arg ) for arg in ip.split( '.' ) ]
-            ipNum( *args )
-            return all([ arg in xrange(256) for arg in args ])
-        except:
-            return False
-
-    def bitSum( self, num ):
-        return bin(num).count('1')
-
-    def getNetmaskFromPrefixLen( self, prefixLen ):
-        mask_binrepr = "1"*(32 - prefixLen) + "0"*(prefixLen)
-        return ipStr(int(mask_binrepr, 2))
-
-    def getPrefixLenFromNetmask( self, netmask ):
-        assert self.isValidIP(netmask) and '/' not in netmask
-        return 32 - self.bitSum(ipParse(netmask))
-
-    def isValidNetmask( self, netmask ):
-        assert self.isValidIP(netmask) and '/' not in netmask
-        prefixLen = self.getPrefixLenFromNetmask(netmask)
-        return netmask == self.getNetmaskFromPrefixLen(prefixLen)
-
-    def isInSameSubnet( self, ip1, ip2, netmask ):
-        assert self.isValidIP(ip1) and '/' not in ip1
-        assert self.isValidIP(ip2) and '/' not in ip2
-        assert self.isValidIP(netmask) and '/' not in netmask
-        assert self.isValidNetmask(netmask)
-        mask = ipParse(netmask)
-        return mask & ipParse(ip1) == mask & ipParse(ip2)
 
     @property
     def IP( self ):
@@ -358,7 +309,7 @@ class VirtualMachine( CMSComponent ):
 
     @IP.setter
     def IP( self, ip ):
-        if not self.isValidIP(ip):
+        if not isValidIP(ip):
             error("Is not a valid IPv4 address: %s\n" % (ip,))
             return
         prefixLen = self.prefixLen
@@ -366,7 +317,7 @@ class VirtualMachine( CMSComponent ):
             ip, prefixLen = netParse(ip)
         self.node.setIP(ip, prefixLen=prefixLen)
         if self.default_gateway:
-            if not self.isInSameSubnet(self.default_gateway, ip, self.netmask):
+            if not isInSameSubnet(self.default_gateway, ip, self.netmask):
                 warn("Gateway not in same subnet anymore.\n")
         self.update_comp_config()
 
@@ -377,28 +328,23 @@ class VirtualMachine( CMSComponent ):
     @prefixLen.setter
     def prefixLen( self, prefixLen ):
         self.IP = self.IP + "/" + prefixLen
-        #self.node.setIP(self.IP, prefixLen=prefixLen)
-        #self.update_comp_config()
 
     @property
     def netmask( self ):
-        return self.getNetmaskFromPrefixLen(self.prefixLen)
+        return getNetmaskFromPrefixLen(self.prefixLen)
 
     @netmask.setter
     def netmask( self, netmask ):
-        if not self.isValidIP(netmask):
+        if not isValidIP(netmask):
             error("Is not a valid IPv4 address: %s\n" % (netmask,))
             return
         if '/' in ip:
             error("Netmask should not set prefix length: %s\n" % (netmask,))
             return
-        if not self.isValidNetmask(netmask):
+        if not isValidNetmask(netmask):
             error("Is not a valid netmask address: %s\n" % (netmask,))
             return
-        self.prefixLen = self.getPrefixLenFromNetmask(netmask)
-        #prefixLen = self.getPrefixLenFromNetmask(netmask)
-        #self.node.setIP(self.IP, prefixLen=prefixLen)
-        #self.update_comp_config()
+        self.prefixLen = getPrefixLenFromNetmask(netmask)
 
     @property
     def default_gateway( self ):
@@ -406,13 +352,13 @@ class VirtualMachine( CMSComponent ):
 
     @default_gateway.setter
     def default_gateway( self, default_gateway ):
-        if not self.isValidIP(default_gateway):
+        if not isValidIP(default_gateway):
             error("Is not a valid IPv4 address: %s\n" % (default_gateway,))
             return
         if '/' in ip:
             error("Gateway should not set prefix: %s\n" % (default_gateway,))
             return
-        if not self.isInSameSubnet(default_gateway, self.IP, self.netmask):
+        if not isInSameSubnet(default_gateway, self.IP, self.netmask):
             warn("Gateway not in same subnet: %s\n" % (default_gateway,))
         self.node.params['default_gateway'] = default_gateway
         self.update_comp_config()
@@ -731,32 +677,3 @@ class Hypervisor( CMSComponent ):
         assert self.is_enabled()
         self._enabled = False
         self.update_comp_config()
-
-
-class ConfigUpdatingDict(dict):
-    def __init__(self, vm, *args, **kwargs):
-        self.vm = None
-        self.update(*args, **kwargs)
-        assert isinstance(vm, CMSComponent)
-        self.vm = vm
-
-    def __setitem__(self, key, value):
-        super(ConfigUpdatingDict, self).__setitem__(key, value)
-        if self.vm:
-            self.vm.update_comp_config()
-
-    def update(self, *args, **kwargs):
-        if args:
-            if len(args) > 1:
-                raise TypeError("update expected at most 1 arguments, "
-                                "got %d" % len(args))
-            other = dict(args[0])
-            for key in other:
-                self[key] = other[key]
-        for key in kwargs:
-            self[key] = kwargs[key]
-
-    def setdefault(self, key, value=None):
-        if key not in self:
-            self[key] = value
-        return self[key]

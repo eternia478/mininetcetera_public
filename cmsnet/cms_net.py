@@ -107,8 +107,7 @@ from cmsnet.cms_log import config_error
 import sys
 import random
 import socket
-import json
-defaultDecoder = json.JSONDecoder()
+from cmsnet.cms_util import defaultDecoder, jsonprint, jsondumps
 
 # For module class searching.
 import mininet.net
@@ -130,8 +129,6 @@ import threading
 cms_channel_lock = threading.RLock()
 
 
-def jsondumps (v):
-    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : ')) + '\n'
 
 
 class CMSnet( object ):
@@ -437,7 +434,7 @@ class CMSnet( object ):
         config_raw = None
         try:
             self.set_net_config(config)
-            config_raw = jsondumps(config)
+            config_raw = jsonprint(config)
         except:
             error_msg = "Config for CMSnet cannot be created."
             config_error(error_msg, config=config)
@@ -606,7 +603,7 @@ class CMSnet( object ):
               'data'        : 'ping',
             }
             try:
-                self.controller_socket.send(json.dumps(msg))
+                self.controller_socket.send(jsondumps(msg))
             except Exception,e:
                 warn("\nCannot send to controller: %s\n" % str(e))
                 self.close_controller_connection()
@@ -643,7 +640,7 @@ class CMSnet( object ):
               'vm_info_list' : [vm.get_info() for vm in self.VMs if on_hv(vm)],
             }
             try:
-                self.controller_socket.send(json.dumps(msg))
+                self.controller_socket.send(jsondumps(msg))
                 info("Sync sent\n")
             except Exception,e:
                 warn("Cannot send to controller: %s\n" % str(e))
@@ -678,7 +675,7 @@ class CMSnet( object ):
                   'old_vm_info' : old_vm_info,
                 }
                 try:
-                    self.controller_socket.send(json.dumps(msg))
+                    self.controller_socket.send(jsondumps(msg))
                 except Exception,e:
                     warn("\nCannot send to controller: %s\n" % str(e))
                     self.close_controller_connection()
