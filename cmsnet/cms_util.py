@@ -12,17 +12,17 @@ import shutil
 
 defaultDecoder = json.JSONDecoder()
 
+def jsondumps( v, **kwargs ):
+    """Messy dump the JSON encoding of the input object.
+       v: Serializable object to encode.
+       returns: String encoded from v."""
+    return json.dumps(v, **kwargs) + '\n'
+
 def jsonprint( v ):
     """Pretty print the JSON encoding of the input object.
        v: Serializable object to encode.
        returns: String encoded from v."""
-    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : ')) + '\n'
-
-def jsondumps( v ):
-    """Messy dump the JSON encoding of the input object.
-       v: Serializable object to encode.
-       returns: String encoded from v."""
-    return json.dumps(v, sort_keys=True) + '\n'
+    return jsondumps(v, sort_keys=True, indent=2, separators=(', ',' : '))
 
 
 
@@ -36,7 +36,7 @@ def makeDirNoErrors( file_path ):
         raise TypeError("File path must be a string.")
     try:
         os.makedirs(file_path)
-    except:
+    except:   # http://stackoverflow.com/questions/273192/#14364249
         if not os.path.isdir(file_path):
             error("Cannot create folder %s.\n" % file_path)
             return False
@@ -50,7 +50,7 @@ def removeNoErrors( file_path ):
         raise TypeError("File path must be a string.")
     try:
         os.remove(file_path)
-    except:
+    except:   # http://stackoverflow.com/questions/17560253
         shutil.rmtree(file_path, ignore_errors=True)
         if os.path.exists(file_path):
             error("File/folder %s not removed.\n" % file_path)
