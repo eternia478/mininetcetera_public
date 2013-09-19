@@ -31,7 +31,8 @@ from mininet.node import Node, Host, Switch
 
 from cmsnet.cms_log import config_error
 import shutil
-from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps, isValidMAC,
+from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps, 
+                              makeDirNoErrors, removeNoErrors, isValidMAC,
                               isValidIP, isValidNetmask, isInSameSubnet,
                               getNetmaskFromPrefixLen, getPrefixLenFromNetmask,
                               UpdatingDict, ConfigUpdatingDict )
@@ -62,11 +63,8 @@ class CMSComponent( object ):
         return self.node.name
 
     @name.setter
-    def name( self, name ):
-        try:      # Remove old config file.
-            os.remove(self.get_config_file_name())
-        except:
-            pass
+    def name( self, name ):        # Remove old config file.
+        removeNoErrors(self.get_config_file_name())
         self.node.name = name
         self.update_comp_config()
 
@@ -96,17 +94,11 @@ class CMSComponent( object ):
 
     def create_temp_folder( self ):
         "Create the component's temporary folder."
-        temp_path = self.get_temp_folder_path()
-        try:
-            os.makedirs(temp_path)
-        except:
-            if not os.path.isdir(temp_path):
-                error("Cannot create temporary folder %s.\n" % temp_path)
+        makeDirNoErrors(self.get_temp_folder_path())
 
     def remove_temp_folder( self ):
         "Remove the component's temporary folder."
-        temp_path = self.get_temp_folder_path()
-        shutil.rmtree(temp_path, ignore_errors=True)
+        removeNoErrors(self.get_temp_folder_path())
 
     def store_temp_folder( self ):
         "UNUSED. Store temporary folder into configuration folder."
@@ -213,10 +205,7 @@ class CMSComponent( object ):
 
     def remove_comp_config( self ):
         "Remove the configurations of this component."
-        try:
-            os.remove(self.get_config_file_name())
-        except:
-            pass
+        removeNoErrors(self.get_config_file_name())
 
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."

@@ -108,6 +108,7 @@ import sys
 import random
 import socket
 from cmsnet.cms_util import defaultDecoder, jsonprint, jsondumps
+from cmsnet.cms_util import makeDirNoErrors, removeNoErrors
 
 # For module class searching.
 import mininet.net
@@ -337,12 +338,7 @@ class CMSnet( object ):
 
     def create_temp_folder( self ):
         "Create CMSnet's temporary folder."
-        temp_path = self.get_temp_folder_path()
-        try:
-            os.makedirs(temp_path)
-        except:
-            if not os.path.isdir(temp_path):
-                error("Cannot create temporary folder %s.\n" % temp_path)
+        makeDirNoErrors(self.get_temp_folder_path())
 
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
@@ -537,7 +533,11 @@ class CMSnet( object ):
         orig_mn_debug_flag1 = self.mn.debug_flag1
         self.debug_flag1 = False
         self.mn.debug_flag1 = False
-        for file_name in os.listdir(self.config_folder):
+        try:
+            config_files = os.listdir(self.config_folder)
+        except:
+            exit( 'exiting; please use a valid config folder location' )
+        for file_name in config_files:
             if file_name.endswith(vm_config_suffix):
                 vm_name = file_name[:-len(vm_config_suffix)]
                 vm = self.createVM(vm_name)
@@ -714,16 +714,13 @@ class CMSnet( object ):
 
     def getPossibleVMScripts( self ):
         "Dynamically obtain all possible scripts for VMs to run."
-        if self.script_folder and os.path.isdir(self.script_folder):
-            return os.listdir(self.script_folder)
-
-        for pypath in sys.path:
-            if not pypath: pypath = "."
-            script_folder = pypath+"/cmsnet/vm_scripts"
-            if os.path.isdir(script_folder):
-                self.script_folder = script_folder
+        for pypath in [self.script_folder]+sys.path:        
+            try:
+                if not pypath: pypath = "."
+                self.script_folder = pypath+"/cmsnet/vm_scripts"
                 return os.listdir(self.script_folder)
-
+            except:
+                pass
         error("\nCannot establish scripts folder.\n")
         return []
 

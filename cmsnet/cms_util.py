@@ -1,7 +1,10 @@
 "Utility functions/classes for CMSnet."
 
+from mininet.log import info, error, warn, debug
 from mininet.util import macColonHex, ipStr, ipNum, ipAdd, ipParse, netParse
 import json
+import os
+import shutil
 
 
 
@@ -20,6 +23,39 @@ def jsondumps( v ):
        v: Serializable object to encode.
        returns: String encoded from v."""
     return json.dumps(v, sort_keys=True) + '\n'
+
+
+
+# File and folder handling
+
+def makeDirNoErrors( file_path ):
+    """Create folder at file_path without OSErrors raised.
+       file_path: Path of folder to create.
+       Returns: True if folder now exists, else False."""
+    if not isinstance(file_path, basestring):
+        raise TypeError("File path must be a string.")
+    try:
+        os.makedirs(file_path)
+    except:
+        if not os.path.isdir(file_path):
+            error("Cannot create folder %s.\n" % file_path)
+            return False
+    return True
+        
+def removeNoErrors( file_path ):
+    """Remove item at file_path without OSErrors raised.
+       file_path: Path of file or folder to remove.
+       Returns: True if file or folder now does not exist, else False."""
+    if not isinstance(file_path, basestring):
+        raise TypeError("File path must be a string.")
+    try:
+        os.remove(file_path)
+    except:
+        shutil.rmtree(file_path, ignore_errors=True)
+        if os.path.exists(file_path):
+            error("File/folder %s not removed.\n" % file_path)
+            return False
+    return True
 
 
 
