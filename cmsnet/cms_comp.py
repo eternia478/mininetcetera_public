@@ -445,12 +445,25 @@ class VirtualMachine( CMSComponent ):
     def get_vm_script_cmd( self, script_type="start" ):
         "Get the bash command to call the VM script with."
         if not self.vm_script:
-            return ""
+            return "echo \"No %s script.\"" % (script_type,)
         assert script_type in ["start", "pause", "resume", "stop", "check"]
         script_folder = self._cmsnet_info.get("script_folder")
         if not script_folder:
             script_folder = "."
+        script_folder += "/vm_scripts"
         return "/".join([script_folder, self.vm_script, script_type])
+
+    def get_autoexec_script_cmd( self, script_type="start" ):
+        "Get the bash command to call the autoexec script with."
+        autoexec_script = self._cmsnet_info.get("autoexec_script")
+        if not autoexec_script:
+            return ""
+        assert script_type in ["start", "stop"]
+        script_folder = self._cmsnet_info.get("script_folder")
+        if not script_folder:
+            script_folder = "."
+        script_folder += "/autoexec_scripts"
+        return "/".join([script_folder, autoexec_script, script_type])
 
     def get_vm_script_params( self ):
         "Get the parameters to run the VM script with."
@@ -489,9 +502,13 @@ class VirtualMachine( CMSComponent ):
 
         init_cmd = "cd {0} && source .cmsnetrc && [ -x \"{1}\" ] && {1}"
         cmd = "{1} >> {0}/log.out 2>> {0}/log.err &"
+        auto_start_cmd = self.get_autoexec_script_cmd(script_type="start")
+        auto_stop_cmd = self.get_autoexec_script_cmd(script_type="stop")
         err = self.node.cmd(init_cmd.format(temp_path, check_script_name))
         if not err:
+            if script_type == "start": self.node.cmd(auto_start_cmd)
             self.node.cmd(cmd.format(temp_path, script_name))
+            if script_type == "stop": self.node.cmd(auto_stop_cmd)
         else:
             error(err+"\n")
 

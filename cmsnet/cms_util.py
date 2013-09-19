@@ -57,6 +57,10 @@ def removeNoErrors( file_path ):
             return False
     return True
 
+def resolvePath( *args ):
+    """Resolve the absolute path given the arguments"""
+    return os.path.abspath(os.path.expanduser(os.path.join("", *args)))
+
 
 
 # IP and Mac address formatting and parsing

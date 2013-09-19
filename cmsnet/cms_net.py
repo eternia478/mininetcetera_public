@@ -108,7 +108,7 @@ import sys
 import random
 import socket
 from cmsnet.cms_util import defaultDecoder, jsonprint, jsondumps
-from cmsnet.cms_util import makeDirNoErrors, removeNoErrors
+from cmsnet.cms_util import makeDirNoErrors, removeNoErrors, resolvePath
 
 # For module class searching.
 import mininet.net
@@ -156,7 +156,10 @@ class CMSnet( object ):
         self.echo_timer = None # Timer that sends echo over CMS channel
 
         self._allow_write_net_config = False
+        self._verbose_script_folder_setup = False
         self.cmsnet_info = {}
+        self.possible_scripts = []
+        self.possible_autoexec_scripts = []
 
         self.new_config = new_config
         self.config_folder = config_folder
@@ -178,7 +181,7 @@ class CMSnet( object ):
 
         self.possible_modes = CMSnet.getPossibleVMDistModes()
         self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
-        self.possible_scripts = self.getPossibleVMScripts()
+        self.setupPossibleScripts()
 
         self.last_hv = None
         self.hv_cycle = []
@@ -265,6 +268,16 @@ class CMSnet( object ):
 
     @script_folder.setter
     def script_folder( self, script_folder ):
+        try:
+            l1 = os.listdir(resolvePath(script_folder, "/vm_scripts"))
+            l2 = os.listdir(resolvePath(script_folder, "/autoexec_scripts"))
+            self.possible_scripts, self.possible_autoexec_scripts = l1, l2
+        except:
+            if self._verbose_script_folder_setup:
+                if self.is_net_config_locked():
+                    raise
+                error("\nError establishing scripts folder.\n")
+            return
         self.cmsnet_info["script_folder"] = script_folder
         self.update_net_config()
 
@@ -278,12 +291,29 @@ class CMSnet( object ):
         self.update_net_config()
 
     @property
+    def autoexec_script( self ):
+        return self.cmsnet_info.get("autoexec_script")
+
+    @autoexec_script.setter
+    def autoexec_script( self, autoexec_script ):
+        self.cmsnet_info["autoexec_script"] = autoexec_script
+        self.update_net_config()
+
+    @property
     def possible_scripts( self ):
         return self.cmsnet_info.get("possible_scripts")
 
     @possible_scripts.setter
     def possible_scripts( self, possible_scripts ):
         self.cmsnet_info["possible_scripts"] = possible_scripts
+
+    @property
+    def possible_autoexec_scripts( self ):
+        return self.cmsnet_info.get("possible_autoexec_scripts")
+
+    @possible_autoexec_scripts.setter
+    def possible_autoexec_scripts( self, psb_autoexec_scripts ):
+        self.cmsnet_info["possible_autoexec_scripts"] = psb_autoexec_scripts
 
 
 
@@ -448,6 +478,7 @@ class CMSnet( object ):
 
     def set_net_config( self, config ):
         "Set the configurations of CMSnet to be saved."
+        config["autoexec_script"] = self.autoexec_script
         config["vm_dist_mode"] = self.vm_dist_mode
         config["vm_dist_limit"] = self.vm_dist_limit
         config["msg_level"] = self.msg_level
@@ -712,17 +743,22 @@ class CMSnet( object ):
         "Dynamically obtain all possible message levels for the controller."
         return ["all", "instantiated", "migrated", "destroyed", "none"]
 
-    def getPossibleVMScripts( self ):
-        "Dynamically obtain all possible scripts for VMs to run."
-        for pypath in [self.script_folder]+sys.path:        
+    def setupPossibleScripts( self ):
+        "Dynamically setup all possible scripts to run."
+        self._verbose_script_folder_setup = True
+        if self.script_folder is not None:
+            return      # Already successfully setup.
+        for pypath in sys.path:        
             try:
                 if not pypath: pypath = "."
-                self.script_folder = pypath+"/cmsnet/vm_scripts"
-                return os.listdir(self.script_folder)
+                self.script_folder = resolvePath(pypath, "/cmsnet")
+                return  # If reach this, line, setup is successful.
             except:
                 pass
         error("\nCannot establish scripts folder.\n")
-        return []
+
+
+
 
 
 
