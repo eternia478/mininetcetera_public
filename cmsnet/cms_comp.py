@@ -286,10 +286,15 @@ class VirtualMachine( CMSComponent ):
 
     @MAC.setter
     def MAC( self, mac ):
+        oldmac = self.MAC
         if not isValidMAC(mac):
             error("Is not a valid MAC address: %s\n" % (mac,))
             return
-        self.node.setMAC(mac)
+        err = self.node.setMAC(mac)
+        if err:
+            error("%s\n" % err)
+            self.node.setMAC(oldmac)
+            return
         self.update_comp_config()
 
     @property
@@ -298,6 +303,8 @@ class VirtualMachine( CMSComponent ):
 
     @IP.setter
     def IP( self, ip ):
+        oldip = self.IP
+        oldpl = self.prefixLen
         if not isValidIP(ip):
             error("Is not a valid IPv4 address: %s\n" % (ip,))
             return
@@ -305,7 +312,11 @@ class VirtualMachine( CMSComponent ):
         if '/' in ip:
             ip, pf = ip.split( '/' )
             prefixLen = int( pf )
-        self.node.setIP(ip, prefixLen=prefixLen)
+        err = self.node.setIP(ip, prefixLen=prefixLen)
+        if err:
+            error("%s\n" % err)
+            self.node.setIP(oldip, prefixLen=oldpl)
+            return
         if self.default_gateway:
             if not isInSameSubnet(self.default_gateway, ip, self.netmask):
                 warn("Gateway not in same subnet anymore.\n")
@@ -317,6 +328,14 @@ class VirtualMachine( CMSComponent ):
 
     @prefixLen.setter
     def prefixLen( self, prefixLen ):
+        try:
+            prefixLen = int(prefixLen)
+        except:
+            error("Prefix length needs to be an integer: %s\n" % (prefixLen,))
+            return
+        if prefixLen not in xrange(0,33):
+            error("Prefix length out of bounds: %s\n" % (prefixLen,))
+            return
         self.IP = "%/%" % (self.IP, prefixLen)
 
     @property
@@ -342,13 +361,15 @@ class VirtualMachine( CMSComponent ):
 
     @default_gateway.setter
     def default_gateway( self, default_gateway ):
-        if not isValidIP(default_gateway):
+        if default_gateway is None:
+            pass
+        elif not isValidIP(default_gateway):
             error("Is not a valid IPv4 address: %s\n" % (default_gateway,))
             return
-        if '/' in default_gateway:
+        elif '/' in default_gateway:
             error("Gateway should not set prefix: %s\n" % (default_gateway,))
             return
-        if not isInSameSubnet(default_gateway, self.IP, self.netmask):
+        elif not isInSameSubnet(default_gateway, self.IP, self.netmask):
             warn("Gateway not in same subnet: %s\n" % (default_gateway,))
         self.node.params['default_gateway'] = default_gateway
         self.update_comp_config()
