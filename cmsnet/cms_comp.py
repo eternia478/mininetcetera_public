@@ -303,7 +303,8 @@ class VirtualMachine( CMSComponent ):
             return
         prefixLen = self.prefixLen
         if '/' in ip:
-            ip, prefixLen = netParse(ip)
+            ip, pf = ip.split( '/' )
+            prefixLen = int( pf )
         self.node.setIP(ip, prefixLen=prefixLen)
         if self.default_gateway:
             if not isInSameSubnet(self.default_gateway, ip, self.netmask):
@@ -316,7 +317,7 @@ class VirtualMachine( CMSComponent ):
 
     @prefixLen.setter
     def prefixLen( self, prefixLen ):
-        self.IP = self.IP + "/" + prefixLen
+        self.IP = "%/%" % (self.IP, prefixLen)
 
     @property
     def netmask( self ):
@@ -327,7 +328,7 @@ class VirtualMachine( CMSComponent ):
         if not isValidIP(netmask):
             error("Is not a valid IPv4 address: %s\n" % (netmask,))
             return
-        if '/' in ip:
+        if '/' in netmask:
             error("Netmask should not set prefix length: %s\n" % (netmask,))
             return
         if not isValidNetmask(netmask):
@@ -344,7 +345,7 @@ class VirtualMachine( CMSComponent ):
         if not isValidIP(default_gateway):
             error("Is not a valid IPv4 address: %s\n" % (default_gateway,))
             return
-        if '/' in ip:
+        if '/' in default_gateway:
             error("Gateway should not set prefix: %s\n" % (default_gateway,))
             return
         if not isInSameSubnet(default_gateway, self.IP, self.netmask):

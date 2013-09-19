@@ -269,8 +269,8 @@ class CMSnet( object ):
     @script_folder.setter
     def script_folder( self, script_folder ):
         try:
-            l1 = os.listdir(resolvePath(script_folder, "/vm_scripts"))
-            l2 = os.listdir(resolvePath(script_folder, "/autoexec_scripts"))
+            l1 = os.listdir(resolvePath(script_folder, "vm_scripts"))
+            l2 = os.listdir(resolvePath(script_folder, "autoexec_scripts"))
             self.possible_scripts, self.possible_autoexec_scripts = l1, l2
         except:
             if self._verbose_script_folder_setup:
@@ -751,7 +751,7 @@ class CMSnet( object ):
         for pypath in sys.path:        
             try:
                 if not pypath: pypath = "."
-                self.script_folder = resolvePath(pypath, "/cmsnet")
+                self.script_folder = resolvePath(pypath, "cmsnet")
                 return  # If reach this, line, setup is successful.
             except:
                 pass

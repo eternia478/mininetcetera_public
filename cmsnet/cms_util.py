@@ -5,6 +5,7 @@ from mininet.util import macColonHex, ipStr, ipNum, ipAdd, ipParse, netParse
 import json
 import os
 import shutil
+import cmsnet.cms_comp
 
 
 
@@ -182,7 +183,7 @@ class ConfigUpdatingDict( UpdatingDict ):
     """Dictionary that updates CMS component configurations when updating."""
 
     def __init__( self, comp, *args, **kwargs ):
-        if not isinstance(comp, CMSComponent):
+        if not isinstance(comp, cmsnet.cms_comp.CMSComponent):
             raise TypeError("%s is not a CMSComponent." % (comp,))
         self.comp = comp
         func = comp.update_comp_config
