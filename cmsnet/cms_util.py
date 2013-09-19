@@ -129,7 +129,7 @@ def getNetmaskFromPrefixLen( prefixLen ):
     """Transform a prefix bit-length into a subnet mask.
        prefixLen: Bit-length of IP address prefix
        returns: Subnet mask string in quad-dotted notation"""
-    mask_binrepr = "1"*(32 - prefixLen) + "0"*(prefixLen)
+    mask_binrepr = "1"*(prefixLen) + "0"*(32 - prefixLen)
     return ipStr(int(mask_binrepr, 2))
 
 def getPrefixLenFromNetmask( netmask ):
@@ -137,7 +137,7 @@ def getPrefixLenFromNetmask( netmask ):
        netmask: Subnet mask string in quad-dotted notation
        returns: Bit-length of IP address prefix"""
     assert isValidIP(netmask) and '/' not in netmask
-    return 32 - bitSum(ipParse(netmask))
+    return bitSum(ipParse(netmask))
 
 
 
