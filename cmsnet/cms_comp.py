@@ -335,7 +335,7 @@ class VirtualMachine( CMSComponent ):
         if prefixLen not in xrange(0,33):
             error("Prefix length out of bounds: %s\n" % (prefixLen,))
             return
-        self.IP = "%/%" % (self.IP, prefixLen)
+        self.IP = "%s/%s" % (self.IP, prefixLen)
 
     @property
     def netmask( self ):
