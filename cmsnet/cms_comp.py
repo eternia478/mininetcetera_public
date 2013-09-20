@@ -294,7 +294,8 @@ class VirtualMachine( CMSComponent ):
         if err:
             error("%s\n" % err)
             self.node.setMAC(oldmac)
-            return
+        if self.default_gateway:
+            self.default_gateway = self.default_gateway # Re-set table.
         self.update_comp_config()
 
     @property
@@ -316,10 +317,8 @@ class VirtualMachine( CMSComponent ):
         if err:
             error("%s\n" % err)
             self.node.setIP(oldip, prefixLen=oldpl)
-            return
         if self.default_gateway:
-            if not isInSameSubnet(self.default_gateway, ip, self.netmask):
-                warn("Gateway not in same subnet anymore.\n")
+            self.default_gateway = self.default_gateway # Re-set table.
         self.update_comp_config()
 
     @property
@@ -357,12 +356,22 @@ class VirtualMachine( CMSComponent ):
 
     @property
     def default_gateway( self ):
-        return self.node.params.get('default_gateway')
+        try:
+            default_route = self.node.params['defaultRoute']
+            default_route_params = default_route.split()
+            gateway = default_route_params[default_route_params.index("via")+1]
+            if not isValidIP(gateway) or '/' in gateway:
+                return None
+            return gateway
+        except:
+            return None
 
     @default_gateway.setter
     def default_gateway( self, default_gateway ):
         if default_gateway is None:
-            pass
+            self.node.params['defaultRoute'] = ""
+            self.update_comp_config()
+            return
         elif not isValidIP(default_gateway):
             error("Is not a valid IPv4 address: %s\n" % (default_gateway,))
             return
@@ -371,7 +380,14 @@ class VirtualMachine( CMSComponent ):
             return
         elif not isInSameSubnet(default_gateway, self.IP, self.netmask):
             warn("Gateway not in same subnet: %s\n" % (default_gateway,))
-        self.node.params['default_gateway'] = default_gateway
+        default_route = "dev %s via %s" % (self.node.intf(), default_gateway)
+        err = self.node.setDefaultRoute(intf=default_route)
+        if err:
+            error("%s\n" % err)
+            olddr = "dev %s via %s" % (self.node.intf(), self.default_gateway)
+            self.node.setDefaultRoute(intf=olddr)
+            return
+        self.node.params['defaultRoute'] = default_route
         self.update_comp_config()
 
     @property
