@@ -529,6 +529,11 @@ class CMSCLI( Cmd ):
         vm_name = None
         script_arg = None
         script_val = None
+        attr_list = ["MAC", "IP", "netmask", "default_gateway"]
+        attr_alias = { 
+            "NETMASK" : "netmask",
+            "DEFAULT_GATEWAY" : "default_gateway",
+        }
 
         if len(args) == 2:
             vm_name = args[0]
@@ -539,13 +544,23 @@ class CMSCLI( Cmd ):
             script_val = args[2]
         else:
             usage = '%s vm_name script_arg [script_val]' % cmd_name
+            exu = '                    or: '
+            exu += '%s vm_name %s [attr_val]' % (cmd_name, "|".join(attr_list))
+            usage += "\n"+exu
             error('invalid number of args: %s\n' % usage)
             return
 
         err, vm = self._check_vm_name(vm_name)
 
         if not err:
-            if script_val is not None:
+            if script_arg in attr_alias:
+                script_arg = attr_alias[script_arg]
+            if script_arg in attr_list:
+                if script_val is not None:
+                    setattr(vm, script_arg, script_val)
+                else:
+                    script_val = getattr(vm, script_arg)
+            elif script_val is not None:
                 vm.vm_script_params[script_arg] = script_val
             elif script_arg not in vm.vm_script_params:
                 error('No current %s for %s.\n' % (script_arg, vm_name))
@@ -559,6 +574,11 @@ class CMSCLI( Cmd ):
         args = line.split()
         vm_name = None
         script_arg = None
+        attr_list = ["MAC", "IP", "netmask", "default_gateway"]
+        attr_alias = { 
+            "NETMASK" : "netmask",
+            "DEFAULT_GATEWAY" : "default_gateway",
+        }
 
         if len(args) == 2:
             vm_name = args[0]
@@ -571,7 +591,12 @@ class CMSCLI( Cmd ):
         err, vm = self._check_vm_name(vm_name)
 
         if not err:
-            if script_arg not in vm.vm_script_params:
+            if script_arg in attr_alias:
+                script_arg = attr_alias[script_arg]
+            if script_arg in attr_list:
+                error('Cannot unset %s for %s.\n' % (script_arg, vm_name))
+                return
+            elif script_arg not in vm.vm_script_params:
                 error('No current %s for %s.\n' % (script_arg, vm_name))
                 return
             del vm.vm_script_params[script_arg]
