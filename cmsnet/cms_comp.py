@@ -24,16 +24,16 @@ from time import sleep
 from mininet.log import info, error, warn, debug
 from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
                            numCores, retry, mountCgroups )
-from mininet.util import macColonHex, ipStr, ipNum, ipAdd, ipParse, netParse
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
 from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
 
 from cmsnet.cms_log import config_error
 import shutil
-from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps, 
-                              makeDirNoErrors, removeNoErrors, isValidMAC,
-                              isValidIP, isValidNetmask, isInSameSubnet,
+from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps,
+                              makeDirNoErrors, removeNoErrors,
+                              isValidMAC, getExpandedIP, isValidIP,
+                              isValidNetmask, isInSameSubnet,
                               getNetmaskFromPrefixLen, getPrefixLenFromNetmask,
                               UpdatingDict, ConfigUpdatingDict )
 
@@ -294,9 +294,10 @@ class VirtualMachine( CMSComponent ):
         if err:
             error("%s\n" % err)
             self.node.setMAC(oldmac)
-        if self.default_gateway:
-            self.default_gateway = self.default_gateway # Re-set table.
-        self.update_comp_config()
+        else:
+            self.update_comp_config()
+        if self.default_gateway:                         # Re-set table.
+            self.default_gateway = self.default_gateway
 
     @property
     def IP( self ):
@@ -306,20 +307,23 @@ class VirtualMachine( CMSComponent ):
     def IP( self, ip ):
         oldip = self.IP
         oldpl = self.prefixLen
-        if not isValidIP(ip):
-            error("Is not a valid IPv4 address: %s\n" % (ip,))
-            return
         prefixLen = self.prefixLen
-        if '/' in ip:
+        ipstr = ip
+        if ip and '/' in ip:
             ip, pf = ip.split( '/' )
             prefixLen = int( pf )
-        err = self.node.setIP(ip, prefixLen=prefixLen)
+        if not isValidIP(ip):
+            error("Is not a valid (CIDR) IPv4 address: %s\n" % (ipstr,))
+            return
+        err = self.node.setIP(getExpandedIP(ip), prefixLen=prefixLen)
         if err:
             error("%s\n" % err)
             self.node.setIP(oldip, prefixLen=oldpl)
-        if self.default_gateway:
-            self.default_gateway = self.default_gateway # Re-set table.
-        self.update_comp_config()
+        else:
+            self.update_comp_config()
+        if self.default_gateway:                         # Re-set table.
+            self.default_gateway = self.default_gateway
+
 
     @property
     def prefixLen( self ):
@@ -332,7 +336,7 @@ class VirtualMachine( CMSComponent ):
         except:
             error("Prefix length needs to be an integer: %s\n" % (prefixLen,))
             return
-        if prefixLen not in xrange(0,33):
+        if prefixLen < 0 or prefixLen > 32:
             error("Prefix length out of bounds: %s\n" % (prefixLen,))
             return
         self.IP = "%s/%s" % (self.IP, prefixLen)
@@ -346,10 +350,7 @@ class VirtualMachine( CMSComponent ):
         if not isValidIP(netmask):
             error("Is not a valid IPv4 address: %s\n" % (netmask,))
             return
-        if '/' in netmask:
-            error("Netmask should not set prefix length: %s\n" % (netmask,))
-            return
-        if not isValidNetmask(netmask):
+        elif not isValidNetmask(netmask):
             error("Is not a valid netmask address: %s\n" % (netmask,))
             return
         self.prefixLen = getPrefixLenFromNetmask(netmask)
@@ -360,23 +361,19 @@ class VirtualMachine( CMSComponent ):
             default_route = self.node.params['defaultRoute']
             default_route_params = default_route.split()
             gateway = default_route_params[default_route_params.index("via")+1]
-            if not isValidIP(gateway) or '/' in gateway:
-                return None
-            return gateway
+            return getExpandedIP(gateway)
         except:
             return None
 
     @default_gateway.setter
     def default_gateway( self, default_gateway ):
         if default_gateway is None:
-            self.node.params['defaultRoute'] = ""
+            self.node.cmd( 'ip route del default' )
+            self.node.params['defaultRoute'] = None
             self.update_comp_config()
             return
         elif not isValidIP(default_gateway):
             error("Is not a valid IPv4 address: %s\n" % (default_gateway,))
-            return
-        elif '/' in default_gateway:
-            error("Gateway should not set prefix: %s\n" % (default_gateway,))
             return
         elif not isInSameSubnet(default_gateway, self.IP, self.netmask):
             warn("Gateway not in same subnet: %s\n" % (default_gateway,))
@@ -386,9 +383,9 @@ class VirtualMachine( CMSComponent ):
             error("%s\n" % err)
             olddr = "dev %s via %s" % (self.node.intf(), self.default_gateway)
             self.node.setDefaultRoute(intf=olddr)
-            return
-        self.node.params['defaultRoute'] = default_route
-        self.update_comp_config()
+        else:
+            self.node.params['defaultRoute'] = default_route
+            self.update_comp_config()
 
     @property
     def hv( self ):

@@ -1,10 +1,11 @@
 "Utility functions/classes for CMSnet."
 
 from mininet.log import info, error, warn, debug
-from mininet.util import macColonHex, ipStr, ipNum, ipAdd, ipParse, netParse
+from mininet.util import macColonHex, ipStr, ipNum#, ipAdd#, ipParse, netParse
 import json
 import os
 import shutil
+import socket
 import cmsnet.cms_comp
 
 
@@ -79,38 +80,68 @@ def macParse( mac ):
        returns: MAC address as unsigned int"""
     return int(mac.replace(":",""), 16)
 
-def isValidMAC( macstr ):
-    """Check if macstr is a valid MAC address.
-       macstr: MAC colon-hex string
-       returns: True if macstr is valid, else False"""
+def isValidMAC( mac ):
+    """Check if mac is a valid MAC address.
+       mac: MAC colon-hex string
+       returns: True if mac is valid, else False"""
     try:
-        macval = macParse(macstr)
-        return macstr == macColonHex(macval)
+        return mac == macColonHex(macParse(mac))
     except:
         return False
 
-def isValidIP( ipstr ):
-    """Check if ipstr is a valid IPv4 address.
-       ipstr: IP address string
-       returns: True if macstr is valid, else False"""
+def _normalizeMACHex( macarg ):
+    """Split and pad hex so long or short MAC colon-hex args are readjusted.
+       macarg: one of the MAC colon-hex string
+       returns: Split or padded equivalent of macarg"""
+    int(macarg, 16) # Make sure this is hex (no empty strings, no spaces, etc.)
+    args = [ "%02x" % int(macarg[i:i+2],16) for i in range(0, len(macarg), 2) ]
+    return ":".join(args)
+
+def getExpandedMAC( mac ):
+    """Expand mac as a MAC address.
+       mac: MAC colon-hex string
+       returns: Full MAC colon-hex notation if valid, else None"""
     try:
-        ip = ipstr
-        if '/' in ipstr:
-            ip, pf = ipstr.split( '/' )
-            prefixLen = int( pf )
-        args = [ int( arg ) for arg in ip.split( '.' ) ]
-        ip_range = range(256)
-        return len(args) == 4 and all([ arg in ip_range for arg in args ])
+        if mac[-1] == ":": mac = mac[:-1]
+        args = [ _normalizeMACHex(arg) for arg in mac.split(":") ]
+        args = ":".join(args).split(":")
+        macval = int("".join(args[:6] + ['00']*(6-len(args))), 16)
+        return macColonHex(macval)
+    except:
+        return None
+
+def ipParse( ip ):
+    """Parse an IP address and return an unsigned int.
+       This method overrides the one in mininet.util"""
+    args = [ ord(c) for c in socket.inet_aton(ip) ]
+    return ipNum( *args )
+
+def isValidIP( ip ):
+    """Check if ip is a valid IPv4 address (without prefix size).
+       ip: IP address string
+       returns: True if IP is valid, else False"""
+    try:                        # LOL, and I actually tried to implement this!
+        socket.inet_aton(ip)    # http://stackoverflow.com/questions/319279
+        return True
     except:
         return False
+
+def getExpandedIP( ip ):
+    """Expand ip as an IPv4 address (without prefix size).
+       ip: IP address string
+       returns: Full IP in quad-dotted notation if valid, else None"""
+    try:
+        return socket.inet_ntoa(socket.inet_aton(ip))
+    except:
+        return None
 
 def isValidNetmask( netmask ):
     """Check if netmask is a valid subnet mask.
        netmask: Subnet mask string in quad-dotted notation
        returns: True if netmask is valid, else False"""
-    assert isValidIP(netmask) and '/' not in netmask
+    assert isValidIP(netmask)
     prefixLen = getPrefixLenFromNetmask(netmask)
-    return netmask == getNetmaskFromPrefixLen(prefixLen)
+    return getExpandedIP(netmask) == getNetmaskFromPrefixLen(prefixLen)
 
 def isInSameSubnet( ip1, ip2, netmask ):
     """Check if two IP address are in the same subnet, given the subnet mask.
@@ -118,25 +149,24 @@ def isInSameSubnet( ip1, ip2, netmask ):
        ip2: Second IP address string
        netmask: Subnet mask string in quad-dotted notation
        returns: True if IP's are in same subnet, else False"""
-    assert isValidIP(ip1) and '/' not in ip1
-    assert isValidIP(ip2) and '/' not in ip2
-    assert isValidIP(netmask) and '/' not in netmask
-    assert isValidNetmask(netmask)
+    assert isValidIP(ip1) and isValidIP(ip2) and isValidIP(netmask)
     mask = ipParse(netmask)
-    return mask & ipParse(ip1) == mask & ipParse(ip2)
+    return (mask & ipParse(ip1)) == (mask & ipParse(ip2))
 
 def getNetmaskFromPrefixLen( prefixLen ):
     """Transform a prefix bit-length into a subnet mask.
        prefixLen: Bit-length of IP address prefix
        returns: Subnet mask string in quad-dotted notation"""
-    mask_binrepr = "1"*(prefixLen) + "0"*(32 - prefixLen)
-    return ipStr(int(mask_binrepr, 2))
+    #mask_binrepr = "1"*(prefixLen) + "0"*(32 - prefixLen)
+    #return ipStr(int(mask_binrepr, 2))
+    assert prefixLen >= 0 and prefixLen <= 32
+    return ipStr(((2 << prefixLen) - 1) << (32 - prefixLen))
 
 def getPrefixLenFromNetmask( netmask ):
     """Transform a subnet mask into a prefix bit-length.
        netmask: Subnet mask string in quad-dotted notation
        returns: Bit-length of IP address prefix"""
-    assert isValidIP(netmask) and '/' not in netmask
+    assert isValidIP(netmask)
     return bitSum(ipParse(netmask))
 
 
