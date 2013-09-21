@@ -529,7 +529,7 @@ class CMSCLI( Cmd ):
         vm_name = None
         script_arg = None
         script_val = None
-        attr_list = ["MAC", "IP", "netmask", "default_gateway"]
+        attr_list = ["MAC", "IP", "netmask", "default_gateway", "vm_script"]
         attr_alias = { 
             "NETMASK" : "netmask",
             "DEFAULT_GATEWAY" : "default_gateway",
@@ -558,8 +558,7 @@ class CMSCLI( Cmd ):
             if script_arg in attr_list:
                 if script_val is not None:
                     setattr(vm, script_arg, script_val)
-                else:
-                    script_val = getattr(vm, script_arg)
+                script_val = getattr(vm, script_arg)
             elif script_val is not None:
                 vm.vm_script_params[script_arg] = script_val
             elif script_arg not in vm.vm_script_params:
@@ -574,7 +573,7 @@ class CMSCLI( Cmd ):
         args = line.split()
         vm_name = None
         script_arg = None
-        attr_list = ["MAC", "IP", "netmask", "default_gateway"]
+        attr_list = ["MAC", "IP", "netmask", "default_gateway", "vm_script"]
         attr_alias = { 
             "NETMASK" : "netmask",
             "DEFAULT_GATEWAY" : "default_gateway",
@@ -594,7 +593,7 @@ class CMSCLI( Cmd ):
             if script_arg in attr_alias:
                 script_arg = attr_alias[script_arg]
             if script_arg in attr_list:
-                error('Cannot unset %s for %s.\n' % (script_arg, vm_name))
+                setattr(vm, script_arg, None)
                 return
             elif script_arg not in vm.vm_script_params:
                 error('No current %s for %s.\n' % (script_arg, vm_name))
