@@ -21,14 +21,14 @@ from subprocess import Popen, PIPE, STDOUT
 from operator import or_
 from time import sleep
 
-from mininet.log import info, error, warn, debug
+#from mininet.log import info, error, warn, debug, output
 from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
                            numCores, retry, mountCgroups )
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
 from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
 
-from cmsnet.cms_log import config_error
+from cmsnet.cms_log import error, info, output, warn, debug, config_error
 import shutil
 from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps,
                               makeDirNoErrors, removeNoErrors,
@@ -155,7 +155,7 @@ class CMSComponent( object ):
             pass
 
         if not config_raw:
-            info("No previous config exists for %s.\n" % self.name)
+            info(self, "No previous config exists.")
             self.unlock_comp_config()
             return
 
@@ -172,8 +172,8 @@ class CMSComponent( object ):
                 else:
                     setattr(self, attr, config[attr])
         except:
-            error_msg = "Previous config for %s cannot be parsed." % self.name
-            config_error(error_msg, config=config, config_raw=config_raw)
+            error_msg = "Previous config cannot be parsed."
+            config_error(self, error_msg, config=config, config_raw=config_raw)
             return
 
     def update_comp_config( self ):
@@ -189,8 +189,8 @@ class CMSComponent( object ):
             self.set_comp_config(config)
             config_raw = jsonprint(config)
         except:
-            error_msg = "Config for %s cannot be created." % self.name
-            config_error(error_msg, config=config)
+            error_msg = "Config cannot be created."
+            config_error(self, error_msg, config=config)
             return
 
         # Part 2: Write to file
@@ -199,8 +199,8 @@ class CMSComponent( object ):
                 f.write(config_raw)
                 f.flush()
         except IOError:
-            error_msg = "Unable to write to config file for %s." % self.name
-            config_error(error_msg, config_raw=config_raw)
+            error_msg = "Unable to write to config file."
+            config_error(self, error_msg, config_raw=config_raw)
             return
 
     def remove_comp_config( self ):
@@ -262,7 +262,7 @@ class VirtualMachine( CMSComponent ):
     def vm_script( self, vm_script ):
         if vm_script:
             if not vm_script in self._cmsnet_info["possible_scripts"]:
-                error("No such script: %s.\n" % vm_script)
+                error(self, "No such script '%s'." % (vm_script,))
                 return
         self._vm_script = vm_script
         self.update_comp_config()
@@ -288,11 +288,11 @@ class VirtualMachine( CMSComponent ):
     def MAC( self, mac ):
         oldmac = self.MAC
         if not isValidMAC(mac):
-            error("Is not a valid MAC address: %s\n" % (mac,))
+            error(self, "'%s' is not a valid MAC address." % (mac,))
             return
         err = self.node.setMAC(mac)
         if err:
-            error("%s\n" % err)
+            error(self, err)
             self.node.setMAC(oldmac)
         else:
             self.update_comp_config()
@@ -313,11 +313,11 @@ class VirtualMachine( CMSComponent ):
             ip, pf = ip.split( '/' )
             prefixLen = int( pf )
         if not isValidIP(ip):
-            error("Is not a valid (CIDR) IPv4 address: %s\n" % (ipstr,))
+            error(self, "'%s' is not a valid (CIDR) IPv4 address." % (ipstr,))
             return
         err = self.node.setIP(getExpandedIP(ip), prefixLen=prefixLen)
         if err:
-            error("%s\n" % err)
+            error(self, err)
             self.node.setIP(oldip, prefixLen=oldpl)
         else:
             self.update_comp_config()
@@ -334,10 +334,10 @@ class VirtualMachine( CMSComponent ):
         try:
             prefixLen = int(prefixLen)
         except:
-            error("Prefix length needs to be an integer: %s\n" % (prefixLen,))
+            error(self, "Prefix length '%s' should be integer." % (prefixLen,))
             return
         if prefixLen < 0 or prefixLen > 32:
-            error("Prefix length out of bounds: %s\n" % (prefixLen,))
+            error(self, "Prefix length '%s' out of bounds." % (prefixLen,))
             return
         self.IP = "%s/%s" % (self.IP, prefixLen)
 
@@ -348,10 +348,10 @@ class VirtualMachine( CMSComponent ):
     @netmask.setter
     def netmask( self, netmask ):
         if not isValidIP(netmask):
-            error("Is not a valid IPv4 address: %s\n" % (netmask,))
+            error(self, "'%s' is not a valid IPv4 address." % (netmask,))
             return
         elif not isValidNetmask(netmask):
-            error("Is not a valid netmask address: %s\n" % (netmask,))
+            error(self, "'%s' is not a valid netmask address." % (netmask,))
             return
         self.prefixLen = getPrefixLenFromNetmask(netmask)
 
@@ -373,14 +373,15 @@ class VirtualMachine( CMSComponent ):
             self.update_comp_config()
             return
         elif not isValidIP(default_gateway):
-            error("Is not a valid IPv4 address: %s\n" % (default_gateway,))
+            error(self, "'%s' is not a valid IPv4 address."%(default_gateway,))
             return
         elif not isInSameSubnet(default_gateway, self.IP, self.netmask):
-            warn("Gateway not in same subnet: %s\n" % (default_gateway,))
+            msg_args = (default_gateway, "%s/%s" % (self.IP, self.prefixLen))
+            warn(self, "Gateway '%s' not in same subnet as %s." % msg_args)
         default_route = "dev %s via %s" % (self.node.intf(), default_gateway)
         err = self.node.setDefaultRoute(intf=default_route)
         if err:
-            error("%s\n" % err)
+            error(self, err)
             olddr = "dev %s via %s" % (self.node.intf(), self.default_gateway)
             self.node.setDefaultRoute(intf=olddr)
         else:
@@ -522,8 +523,8 @@ class VirtualMachine( CMSComponent ):
                     f.write("export %s=%s\n" % (arg, val))
                 f.flush()
         except IOError:
-            error_msg = "Unable to make rc file for %s." % self.name
-            config_error(error_msg)
+            error_msg = "Unable to make rc file."
+            config_error(self, error_msg)
             return
 
     def run_vm_script( self, script_type="start" ):
@@ -545,7 +546,7 @@ class VirtualMachine( CMSComponent ):
             self.node.cmd(cmd.format(temp_path, script_name))
             if script_type == "stop": self.node.cmd(auto_stop_cmd)
         else:
-            error(err+"\n")
+            error(self, err)
 
     def cloneTo( self, new_vm ):
         "Clone information from this VM to the new VM image."

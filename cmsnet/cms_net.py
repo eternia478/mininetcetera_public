@@ -447,7 +447,7 @@ class CMSnet( object ):
                 warn("\nNo topology exists for CMSnet.\n")
         except:
             error_msg = "Config for CMSnet cannot be parsed."
-            config_error(error_msg, config=config, config_raw=config_raw)
+            config_error(self, error_msg, config=config, config_raw=config_raw)
             return
 
     def update_net_config( self ):
@@ -463,7 +463,7 @@ class CMSnet( object ):
             config_raw = jsonprint(config)
         except:
             error_msg = "Config for CMSnet cannot be created."
-            config_error(error_msg, config=config)
+            config_error(self, error_msg, config=config)
             return
 
         # Part 2: Write to file
@@ -473,7 +473,7 @@ class CMSnet( object ):
                 f.flush()
         except IOError:
             error_msg = "Unable to write to config file for CMSnet."
-            config_error(error_msg, config_raw=config_raw)
+            config_error(self, error_msg, config_raw=config_raw)
             return
 
     def set_net_config( self, config ):
