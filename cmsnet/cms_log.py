@@ -1,6 +1,6 @@
 "Logging functions for CMSnet."
 
-from mininet.log import error, info, output, warn, debug
+import mininet.log as log
 import traceback
 import cmsnet.cms_comp
 
@@ -15,23 +15,23 @@ def _add_name_to_msg (comp, log_msg=None):
 
 def error (comp, error_msg=None ):
     "Log message to error and include component name."
-    error("%s\n" % _add_name_to_msg(comp, error_msg))
+    log.error("%s\n" % _add_name_to_msg(comp, error_msg))
 
 def info (comp, info_msg=None ):
     "Log message to info and include component name."
-    info("%s\n" % _add_name_to_msg(comp, info_msg))
+    log.info("%s\n" % _add_name_to_msg(comp, info_msg))
 
 def output (comp, output_msg=None ):
     "Log message to output and include component name."
-    output("%s\n" % _add_name_to_msg(comp, output_msg))
+    log.output("%s\n" % _add_name_to_msg(comp, output_msg))
 
 def warn (comp, warn_msg=None ):
     "Log message to warning and include component name."
-    warn("%s\n" % _add_name_to_msg(comp, warn_msg))
+    log.warn("%s\n" % _add_name_to_msg(comp, warn_msg))
 
 def debug (comp, debug_msg=None ):
     "Log message to debug and include component name."
-    debug("%s\n" % _add_name_to_msg(comp, debug_msg))
+    log.debug("%s\n" % _add_name_to_msg(comp, debug_msg))
 
 def config_error (comp, error_msg, config=None, config_raw=None):
     "Output error messages for config handling."
@@ -46,4 +46,4 @@ def config_error (comp, error_msg, config=None, config_raw=None):
     if config_raw is not None:
         config_info.append("\tconfig_raw = %s" % config_raw)
 
-    error("\n".join([""] + error_info + config_info + [""]))
+    log.error("\n".join([""] + error_info + config_info + [""]))
