@@ -755,14 +755,14 @@ class CMSCLI( Cmd ):
             autoexec_script = args[0]
         else:
             usage = '%s [autoexec_script]' % cmd_name
-            exu = '               options: '
-            autoexec_script_list = "|".join(self.cn.possible_autoexec_scripts)
-            exu += "%s [%s]" % (cmd_name, autoexec_script_list)
             error('invalid number of args: %s\n' % usage)
             return
 
         if autoexec_script not in self.cn.possible_autoexec_scripts:
             error('No such autoexec script: %s\n' % autoexec_script)
+            exu = '                options: '
+            exu += " ".join(self.cn.possible_autoexec_scripts)
+            error('%s\n' % exu)
             return
 
         self.cn.autoexec_script = autoexec_script

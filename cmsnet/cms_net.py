@@ -296,7 +296,8 @@ class CMSnet( object ):
 
     @autoexec_script.setter
     def autoexec_script( self, autoexec_script ):
-        assert autoexec_script in self.possible_autoexec_scripts
+        is_valid_autoexec = autoexec_script in self.possible_autoexec_scripts
+        assert not autoexec_script or is_valid_autoexec
         self.cmsnet_info["autoexec_script"] = autoexec_script
         self.update_net_config()
 
