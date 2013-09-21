@@ -742,6 +742,31 @@ class CMSCLI( Cmd ):
 
         self.cn.changeCMSMsgLevel(msg_level)
 
+    def do_auto( self, line, cmd_name="auto" ):
+        "Change the autoexec script type."
+        args = line.split()
+        autoexec_script = None
+
+        if len(args) == 0:
+            out_str = "autoexec: %s" % self.cn.autoexec_script
+            output(out_str+"\n")
+            return
+        elif len(args) == 1:
+            autoexec_script = args[0]
+        else:
+            usage = '%s [autoexec_script]' % cmd_name
+            exu = '               options: '
+            autoexec_script_list = "|".join(self.cn.possible_autoexec_scripts)
+            exu += "%s [%s]" % (cmd_name, autoexec_script_list)
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        if autoexec_script not in self.cn.possible_autoexec_scripts:
+            error('No such autoexec script: %s\n' % autoexec_script)
+            return
+
+        self.cn.autoexec_script = autoexec_script
+
 
 
 
