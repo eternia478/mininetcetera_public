@@ -107,8 +107,8 @@ from cmsnet.cms_log import config_error
 import sys
 import random
 import socket
-import json
-defaultDecoder = json.JSONDecoder()
+from cmsnet.cms_util import defaultDecoder, jsonprint, jsondumps
+from cmsnet.cms_util import makeDirNoErrors, removeNoErrors, resolvePath
 
 # For module class searching.
 import mininet.net
@@ -130,8 +130,6 @@ import threading
 cms_channel_lock = threading.RLock()
 
 
-def jsondumps (v):
-    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : ')) + '\n'
 
 
 class CMSnet( object ):
@@ -158,7 +156,10 @@ class CMSnet( object ):
         self.echo_timer = None # Timer that sends echo over CMS channel
 
         self._allow_write_net_config = False
+        self._verbose_script_folder_setup = False
         self.cmsnet_info = {}
+        self.possible_scripts = []
+        self.possible_autoexec_scripts = []
 
         self.new_config = new_config
         self.config_folder = config_folder
@@ -180,7 +181,7 @@ class CMSnet( object ):
 
         self.possible_modes = CMSnet.getPossibleVMDistModes()
         self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
-        self.possible_scripts = self.getPossibleVMScripts()
+        self.setupPossibleScripts()
 
         self.last_hv = None
         self.hv_cycle = []
@@ -267,6 +268,16 @@ class CMSnet( object ):
 
     @script_folder.setter
     def script_folder( self, script_folder ):
+        try:
+            l1 = os.listdir(resolvePath(script_folder, "vm_scripts"))
+            l2 = os.listdir(resolvePath(script_folder, "autoexec_scripts"))
+            self.possible_scripts, self.possible_autoexec_scripts = l1, l2
+        except:
+            if self._verbose_script_folder_setup:
+                if self.is_net_config_locked():
+                    raise
+                error("\nError establishing scripts folder.\n")
+            return
         self.cmsnet_info["script_folder"] = script_folder
         self.update_net_config()
 
@@ -280,12 +291,31 @@ class CMSnet( object ):
         self.update_net_config()
 
     @property
+    def autoexec_script( self ):
+        return self.cmsnet_info.get("autoexec_script")
+
+    @autoexec_script.setter
+    def autoexec_script( self, autoexec_script ):
+        is_valid_autoexec = autoexec_script in self.possible_autoexec_scripts
+        assert not autoexec_script or is_valid_autoexec
+        self.cmsnet_info["autoexec_script"] = autoexec_script
+        self.update_net_config()
+
+    @property
     def possible_scripts( self ):
         return self.cmsnet_info.get("possible_scripts")
 
     @possible_scripts.setter
     def possible_scripts( self, possible_scripts ):
         self.cmsnet_info["possible_scripts"] = possible_scripts
+
+    @property
+    def possible_autoexec_scripts( self ):
+        return self.cmsnet_info.get("possible_autoexec_scripts")
+
+    @possible_autoexec_scripts.setter
+    def possible_autoexec_scripts( self, psb_autoexec_scripts ):
+        self.cmsnet_info["possible_autoexec_scripts"] = psb_autoexec_scripts
 
 
 
@@ -340,12 +370,7 @@ class CMSnet( object ):
 
     def create_temp_folder( self ):
         "Create CMSnet's temporary folder."
-        temp_path = self.get_temp_folder_path()
-        try:
-            os.makedirs(temp_path)
-        except:
-            if not os.path.isdir(temp_path):
-                error("Cannot create temporary folder %s.\n" % temp_path)
+        makeDirNoErrors(self.get_temp_folder_path())
 
     def get_config_file_name( self ):
         "Return the file name of the configuration file."
@@ -424,7 +449,7 @@ class CMSnet( object ):
                 warn("\nNo topology exists for CMSnet.\n")
         except:
             error_msg = "Config for CMSnet cannot be parsed."
-            config_error(error_msg, config=config, config_raw=config_raw)
+            config_error(self, error_msg, config=config, config_raw=config_raw)
             return
 
     def update_net_config( self ):
@@ -437,10 +462,10 @@ class CMSnet( object ):
         config_raw = None
         try:
             self.set_net_config(config)
-            config_raw = jsondumps(config)
+            config_raw = jsonprint(config)
         except:
             error_msg = "Config for CMSnet cannot be created."
-            config_error(error_msg, config=config)
+            config_error(self, error_msg, config=config)
             return
 
         # Part 2: Write to file
@@ -450,11 +475,12 @@ class CMSnet( object ):
                 f.flush()
         except IOError:
             error_msg = "Unable to write to config file for CMSnet."
-            config_error(error_msg, config_raw=config_raw)
+            config_error(self, error_msg, config_raw=config_raw)
             return
 
     def set_net_config( self, config ):
         "Set the configurations of CMSnet to be saved."
+        config["autoexec_script"] = self.autoexec_script
         config["vm_dist_mode"] = self.vm_dist_mode
         config["vm_dist_limit"] = self.vm_dist_limit
         config["msg_level"] = self.msg_level
@@ -540,7 +566,11 @@ class CMSnet( object ):
         orig_mn_debug_flag1 = self.mn.debug_flag1
         self.debug_flag1 = False
         self.mn.debug_flag1 = False
-        for file_name in os.listdir(self.config_folder):
+        try:
+            config_files = os.listdir(self.config_folder)
+        except:
+            exit( 'exiting; please use a valid config folder location' )
+        for file_name in config_files:
             if file_name.endswith(vm_config_suffix):
                 vm_name = file_name[:-len(vm_config_suffix)]
                 vm = self.createVM(vm_name)
@@ -606,7 +636,7 @@ class CMSnet( object ):
               'data'        : 'ping',
             }
             try:
-                self.controller_socket.send(json.dumps(msg))
+                self.controller_socket.send(jsondumps(msg))
             except Exception,e:
                 warn("\nCannot send to controller: %s\n" % str(e))
                 self.close_controller_connection()
@@ -643,7 +673,7 @@ class CMSnet( object ):
               'vm_info_list' : [vm.get_info() for vm in self.VMs if on_hv(vm)],
             }
             try:
-                self.controller_socket.send(json.dumps(msg))
+                self.controller_socket.send(jsondumps(msg))
                 info("Sync sent\n")
             except Exception,e:
                 warn("Cannot send to controller: %s\n" % str(e))
@@ -678,7 +708,7 @@ class CMSnet( object ):
                   'old_vm_info' : old_vm_info,
                 }
                 try:
-                    self.controller_socket.send(json.dumps(msg))
+                    self.controller_socket.send(jsondumps(msg))
                 except Exception,e:
                     warn("\nCannot send to controller: %s\n" % str(e))
                     self.close_controller_connection()
@@ -715,20 +745,22 @@ class CMSnet( object ):
         "Dynamically obtain all possible message levels for the controller."
         return ["all", "instantiated", "migrated", "destroyed", "none"]
 
-    def getPossibleVMScripts( self ):
-        "Dynamically obtain all possible scripts for VMs to run."
-        if self.script_folder and os.path.isdir(self.script_folder):
-            return os.listdir(self.script_folder)
-
-        for pypath in sys.path:
-            if not pypath: pypath = "."
-            script_folder = pypath+"/cmsnet/vm_scripts"
-            if os.path.isdir(script_folder):
-                self.script_folder = script_folder
-                return os.listdir(self.script_folder)
-
+    def setupPossibleScripts( self ):
+        "Dynamically setup all possible scripts to run."
+        self._verbose_script_folder_setup = True
+        if self.script_folder is not None:
+            return      # Already successfully setup.
+        for pypath in sys.path:        
+            try:
+                if not pypath: pypath = "."
+                self.script_folder = resolvePath(pypath, "cmsnet")
+                return  # If reach this, line, setup is successful.
+            except:
+                pass
         error("\nCannot establish scripts folder.\n")
-        return []
+
+
+
 
 
 

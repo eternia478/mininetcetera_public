@@ -523,6 +523,82 @@ class CMSCLI( Cmd ):
         for vminfo in l:
           print "%-10s %-14s %-17s %s" % vminfo
 
+    def do_set( self, line, cmd_name='set' ):
+        "Set VM script parameters, or print current parameter values."
+        args = line.split()
+        vm_name = None
+        script_arg = None
+        script_val = None
+        attr_list = ["MAC", "IP", "netmask", "default_gateway", "vm_script"]
+        attr_alias = { 
+            "NETMASK" : "netmask",
+            "DEFAULT_GATEWAY" : "default_gateway",
+        }
+
+        if len(args) == 2:
+            vm_name = args[0]
+            script_arg = args[1]
+        elif len(args) == 3:
+            vm_name = args[0]
+            script_arg = args[1]
+            script_val = args[2]
+        else:
+            usage = '%s vm_name script_arg [script_val]' % cmd_name
+            exu = '                    or: '
+            exu += '%s vm_name %s [attr_val]' % (cmd_name, "|".join(attr_list))
+            usage += "\n"+exu
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, vm = self._check_vm_name(vm_name)
+
+        if not err:
+            if script_arg in attr_alias:
+                script_arg = attr_alias[script_arg]
+            if script_arg in attr_list:
+                if script_val is not None:
+                    setattr(vm, script_arg, script_val)
+                script_val = getattr(vm, script_arg)
+            elif script_val is not None:
+                vm.vm_script_params[script_arg] = script_val
+            elif script_arg not in vm.vm_script_params:
+                error('No current %s for %s.\n' % (script_arg, vm_name))
+                return
+            else:
+                script_val = vm.vm_script_params[script_arg]
+            output("%s: %s = %s\n" % (vm_name, script_arg, script_val))
+
+    def do_unset( self, line, cmd_name='unset' ):
+        "Unset VM script parameters."
+        args = line.split()
+        vm_name = None
+        script_arg = None
+        attr_list = ["MAC", "IP", "netmask", "default_gateway", "vm_script"]
+        attr_alias = { 
+            "NETMASK" : "netmask",
+            "DEFAULT_GATEWAY" : "default_gateway",
+        }
+
+        if len(args) == 2:
+            vm_name = args[0]
+            script_arg = args[1]
+        else:
+            usage = '%s vm_name script_arg' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        err, vm = self._check_vm_name(vm_name)
+
+        if not err:
+            if script_arg in attr_alias:
+                script_arg = attr_alias[script_arg]
+            if script_arg in attr_list:
+                setattr(vm, script_arg, None)
+                return
+            elif script_arg not in vm.vm_script_params:
+                error('No current %s for %s.\n' % (script_arg, vm_name))
+                return
+            del vm.vm_script_params[script_arg]
 
 
 
@@ -664,6 +740,31 @@ class CMSCLI( Cmd ):
             return
 
         self.cn.changeCMSMsgLevel(msg_level)
+
+    def do_auto( self, line, cmd_name="auto" ):
+        "Change the autoexec script type."
+        args = line.split()
+        autoexec_script = None
+
+        if len(args) == 0:
+            out_str = "autoexec: %s" % self.cn.autoexec_script
+            output(out_str+"\n")
+            return
+        elif len(args) == 1:
+            autoexec_script = args[0]
+        else:
+            usage = '%s [autoexec_script]' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        if autoexec_script not in self.cn.possible_autoexec_scripts:
+            error('No such autoexec script: %s\n' % autoexec_script)
+            exu = '                options: '
+            exu += " ".join(self.cn.possible_autoexec_scripts)
+            error('%s\n' % exu)
+            return
+
+        self.cn.autoexec_script = autoexec_script
 
 
 

@@ -21,22 +21,21 @@ from subprocess import Popen, PIPE, STDOUT
 from operator import or_
 from time import sleep
 
-from mininet.log import info, error, warn, debug
+#from mininet.log import info, error, warn, debug, output
 from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
                            numCores, retry, mountCgroups )
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
 from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
 
-from cmsnet.cms_log import config_error
+from cmsnet.cms_log import error, info, output, warn, debug, config_error
 import shutil
-import json
-defaultDecoder = json.JSONDecoder()
-
-
-def jsondumps (v):
-    return json.dumps(v, sort_keys=True, indent=2, separators=(', ',' : ')) + '\n'
-
+from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps,
+                              makeDirNoErrors, removeNoErrors,
+                              isValidMAC, getExpandedIP, isValidIP,
+                              isValidNetmask, isInSameSubnet,
+                              getNetmaskFromPrefixLen, getPrefixLenFromNetmask,
+                              UpdatingDict, ConfigUpdatingDict )
 
 class CMSComponent( object ):
     """A component of the cloud network. This is simply a wrapper for Node
@@ -64,11 +63,8 @@ class CMSComponent( object ):
         return self.node.name
 
     @name.setter
-    def name( self, name ):
-        try:      # Remove old config file.
-            os.remove(self.get_config_file_name())
-        except:
-            pass
+    def name( self, name ):        # Remove old config file.
+        removeNoErrors(self.get_config_file_name())
         self.node.name = name
         self.update_comp_config()
 
@@ -98,17 +94,11 @@ class CMSComponent( object ):
 
     def create_temp_folder( self ):
         "Create the component's temporary folder."
-        temp_path = self.get_temp_folder_path()
-        try:
-            os.makedirs(temp_path)
-        except:
-            if not os.path.isdir(temp_path):
-                error("Cannot create temporary folder %s.\n" % temp_path)
+        makeDirNoErrors(self.get_temp_folder_path())
 
     def remove_temp_folder( self ):
         "Remove the component's temporary folder."
-        temp_path = self.get_temp_folder_path()
-        shutil.rmtree(temp_path, ignore_errors=True)
+        removeNoErrors(self.get_temp_folder_path())
 
     def store_temp_folder( self ):
         "UNUSED. Store temporary folder into configuration folder."
@@ -165,7 +155,7 @@ class CMSComponent( object ):
             pass
 
         if not config_raw:
-            info("No previous config exists for %s.\n" % self.name)
+            info(self, "No previous config exists.")
             self.unlock_comp_config()
             return
 
@@ -182,8 +172,8 @@ class CMSComponent( object ):
                 else:
                     setattr(self, attr, config[attr])
         except:
-            error_msg = "Previous config for %s cannot be parsed." % self.name
-            config_error(error_msg, config=config, config_raw=config_raw)
+            error_msg = "Previous config cannot be parsed."
+            config_error(self, error_msg, config=config, config_raw=config_raw)
             return
 
     def update_comp_config( self ):
@@ -197,10 +187,10 @@ class CMSComponent( object ):
         config_raw = None
         try:
             self.set_comp_config(config)
-            config_raw = jsondumps(config)
+            config_raw = jsonprint(config)
         except:
-            error_msg = "Config for %s cannot be created." % self.name
-            config_error(error_msg, config=config)
+            error_msg = "Config cannot be created."
+            config_error(self, error_msg, config=config)
             return
 
         # Part 2: Write to file
@@ -209,16 +199,13 @@ class CMSComponent( object ):
                 f.write(config_raw)
                 f.flush()
         except IOError:
-            error_msg = "Unable to write to config file for %s." % self.name
-            config_error(error_msg, config_raw=config_raw)
+            error_msg = "Unable to write to config file."
+            config_error(self, error_msg, config_raw=config_raw)
             return
 
     def remove_comp_config( self ):
         "Remove the configurations of this component."
-        try:
-            os.remove(self.get_config_file_name())
-        except:
-            pass
+        removeNoErrors(self.get_config_file_name())
 
     def set_comp_config( self, config ):
         "Set the configurations of this component to be saved."
@@ -275,7 +262,7 @@ class VirtualMachine( CMSComponent ):
     def vm_script( self, vm_script ):
         if vm_script:
             if not vm_script in self._cmsnet_info["possible_scripts"]:
-                error("No such script: %s.\n" % vm_script)
+                error(self, "No such script '%s'." % (vm_script,))
                 return
         self._vm_script = vm_script
         self.update_comp_config()
@@ -294,22 +281,112 @@ class VirtualMachine( CMSComponent ):
         return self._tenant_id
 
     @property
-    def IP( self ):
-        return self.node.IP()
-
-    @IP.setter
-    def IP( self, ip ):
-        self.node.setIP(ip)
-        self.update_comp_config()
-
-    @property
     def MAC( self ):
         return self.node.MAC()
 
     @MAC.setter
     def MAC( self, mac ):
-        self.node.setMAC(mac)
-        self.update_comp_config()
+        oldmac = self.MAC
+        if not isValidMAC(mac):
+            error(self, "'%s' is not a valid MAC address." % (mac,))
+            return
+        err = self.node.setMAC(mac)
+        if err:
+            error(self, err)
+            self.node.setMAC(oldmac)
+        else:
+            self.update_comp_config()
+        if self.default_gateway:                         # Re-set table.
+            self.default_gateway = self.default_gateway
+
+    @property
+    def IP( self ):
+        return self.node.IP()
+
+    @IP.setter
+    def IP( self, ip ):
+        oldip = self.IP
+        oldpl = self.prefixLen
+        prefixLen = self.prefixLen
+        ipstr = ip
+        if ip and '/' in ip:
+            ip, pf = ip.split( '/' )
+            prefixLen = int( pf )
+        if not isValidIP(ip):
+            error(self, "'%s' is not a valid (CIDR) IPv4 address." % (ipstr,))
+            return
+        err = self.node.setIP(getExpandedIP(ip), prefixLen=prefixLen)
+        if err:
+            error(self, err)
+            self.node.setIP(oldip, prefixLen=oldpl)
+        else:
+            self.update_comp_config()
+        if self.default_gateway:                         # Re-set table.
+            self.default_gateway = self.default_gateway
+
+
+    @property
+    def prefixLen( self ):
+        return int(self.node.intf().prefixLen)
+
+    @prefixLen.setter
+    def prefixLen( self, prefixLen ):
+        try:
+            prefixLen = int(prefixLen)
+        except:
+            error(self, "Prefix length '%s' should be integer." % (prefixLen,))
+            return
+        if prefixLen < 0 or prefixLen > 32:
+            error(self, "Prefix length '%s' out of bounds." % (prefixLen,))
+            return
+        self.IP = "%s/%s" % (self.IP, prefixLen)
+
+    @property
+    def netmask( self ):
+        return getNetmaskFromPrefixLen(self.prefixLen)
+
+    @netmask.setter
+    def netmask( self, netmask ):
+        if not isValidIP(netmask):
+            error(self, "'%s' is not a valid IPv4 address." % (netmask,))
+            return
+        elif not isValidNetmask(netmask):
+            error(self, "'%s' is not a valid netmask address." % (netmask,))
+            return
+        self.prefixLen = getPrefixLenFromNetmask(netmask)
+
+    @property
+    def default_gateway( self ):
+        try:
+            default_route = self.node.params['defaultRoute']
+            default_route_params = default_route.split()
+            gateway = default_route_params[default_route_params.index("via")+1]
+            return getExpandedIP(gateway)
+        except:
+            return None
+
+    @default_gateway.setter
+    def default_gateway( self, default_gateway ):
+        if default_gateway is None:
+            self.node.cmd( 'ip route del default' )
+            self.node.params['defaultRoute'] = None
+            self.update_comp_config()
+            return
+        elif not isValidIP(default_gateway):
+            error(self, "'%s' is not a valid IPv4 address."%(default_gateway,))
+            return
+        elif not isInSameSubnet(default_gateway, self.IP, self.netmask):
+            msg_args = (default_gateway, "%s/%s" % (self.IP, self.prefixLen))
+            warn(self, "Gateway '%s' not in same subnet as %s." % msg_args)
+        default_route = "dev %s via %s" % (self.node.intf(), default_gateway)
+        err = self.node.setDefaultRoute(intf=default_route)
+        if err:
+            error(self, err)
+            olddr = "dev %s via %s" % (self.node.intf(), self.default_gateway)
+            self.node.setDefaultRoute(intf=olddr)
+        else:
+            self.node.params['defaultRoute'] = default_route
+            self.update_comp_config()
 
     @property
     def hv( self ):
@@ -364,11 +441,13 @@ class VirtualMachine( CMSComponent ):
     def get_info( self ):
         "Get information to be sent with a CMS message to the controller."
         info = {
-          'name'          : self.name,
-          'mac_addr'      : self.MAC,
-          'ip_addr'       : self.IP,
-          'hv_dpid'       : self.hv_dpid,
-          'hv_port_to_vm' : self.hv_port_to_vm,
+          'name'            : self.name,
+          'mac_addr'        : self.MAC,
+          'ip_addr'         : self.IP,
+          'netmask'         : self.netmask,
+          'default_gateway' : self.default_gateway,
+          'hv_dpid'         : self.hv_dpid,
+          'hv_port_to_vm'   : self.hv_port_to_vm,
         }
         return info
 
@@ -384,8 +463,10 @@ class VirtualMachine( CMSComponent ):
         config["vm_script"] = self.vm_script
         config["vm_script_params"] = self.vm_script_params
         config["_tenant_id"] = self._tenant_id
-        config["IP"] = self.IP
         config["MAC"] = self.MAC
+        config["IP"] = self.IP
+        config["netmask"] = self.netmask
+        config["default_gateway"] = self.default_gateway
         config["config_hv_name"] = self.hv_name
         config["config_is_paused"] = self.is_paused()
 
@@ -400,18 +481,36 @@ class VirtualMachine( CMSComponent ):
     def get_vm_script_cmd( self, script_type="start" ):
         "Get the bash command to call the VM script with."
         if not self.vm_script:
-            return ""
+            return "echo \"No %s script.\"" % (script_type,)
         assert script_type in ["start", "pause", "resume", "stop", "check"]
         script_folder = self._cmsnet_info.get("script_folder")
         if not script_folder:
             script_folder = "."
+        script_folder += "/vm_scripts"
         return "/".join([script_folder, self.vm_script, script_type])
+
+    def get_autoexec_script_cmd( self, script_type="start" ):
+        "Get the bash command to call the autoexec script with."
+        autoexec_script = self._cmsnet_info.get("autoexec_script")
+        if not autoexec_script:
+            return ""
+        assert script_type in ["start", "stop"]
+        script_folder = self._cmsnet_info.get("script_folder")
+        if not script_folder:
+            script_folder = "."
+        script_folder += "/autoexec_scripts"
+        return "/".join([script_folder, autoexec_script, script_type])
 
     def get_vm_script_params( self ):
         "Get the parameters to run the VM script with."
-        default_params = { 'HOME': self.get_temp_folder_path(),
-                           'NAME': self.name,
-                           'IP': self.IP, }
+        default_params = { 
+          'HOME'            : self.get_temp_folder_path(),
+          'NAME'            : self.name,
+          'MAC'             : self.MAC,
+          'IP'              : self.IP,
+          'NETMASK'         : self.netmask,
+          'DEFAULT_GATEWAY' : self.default_gateway, 
+        }
         default_params.update(self.vm_script_params)
         return default_params
 
@@ -424,8 +523,8 @@ class VirtualMachine( CMSComponent ):
                     f.write("export %s=%s\n" % (arg, val))
                 f.flush()
         except IOError:
-            error_msg = "Unable to make rc file for %s." % self.name
-            config_error(error_msg)
+            error_msg = "Unable to make rc file."
+            config_error(self, error_msg)
             return
 
     def run_vm_script( self, script_type="start" ):
@@ -439,11 +538,15 @@ class VirtualMachine( CMSComponent ):
 
         init_cmd = "cd {0} && source .cmsnetrc && [ -x \"{1}\" ] && {1}"
         cmd = "{1} >> {0}/log.out 2>> {0}/log.err &"
+        auto_start_cmd = self.get_autoexec_script_cmd(script_type="start")
+        auto_stop_cmd = self.get_autoexec_script_cmd(script_type="stop")
         err = self.node.cmd(init_cmd.format(temp_path, check_script_name))
         if not err:
+            if script_type == "start": self.node.cmd(auto_start_cmd)
             self.node.cmd(cmd.format(temp_path, script_name))
+            if script_type == "stop": self.node.cmd(auto_stop_cmd)
         else:
-            error(err+"\n")
+            error(self, err)
 
     def cloneTo( self, new_vm ):
         "Clone information from this VM to the new VM image."
@@ -616,32 +719,3 @@ class Hypervisor( CMSComponent ):
         assert self.is_enabled()
         self._enabled = False
         self.update_comp_config()
-
-
-class ConfigUpdatingDict(dict):
-    def __init__(self, vm, *args, **kwargs):
-        self.vm = None
-        self.update(*args, **kwargs)
-        assert isinstance(vm, CMSComponent)
-        self.vm = vm
-
-    def __setitem__(self, key, value):
-        super(ConfigUpdatingDict, self).__setitem__(key, value)
-        if self.vm:
-            self.vm.update_comp_config()
-
-    def update(self, *args, **kwargs):
-        if args:
-            if len(args) > 1:
-                raise TypeError("update expected at most 1 arguments, "
-                                "got %d" % len(args))
-            other = dict(args[0])
-            for key in other:
-                self[key] = other[key]
-        for key in kwargs:
-            self[key] = kwargs[key]
-
-    def setdefault(self, key, value=None):
-        if key not in self:
-            self[key] = value
-        return self[key]
