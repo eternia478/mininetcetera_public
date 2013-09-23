@@ -646,7 +646,7 @@ class Hypervisor( CMSComponent ):
 
     @property
     def dpid( self ):
-        return self.node.dpid
+        return getattr(self.node, 'real_dpid', self.node.dpid)
 
     @dpid.setter
     def dpid( self, dpid ):
