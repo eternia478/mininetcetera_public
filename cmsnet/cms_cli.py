@@ -1098,7 +1098,7 @@ class CMSCLI( Cmd ):
                     error( "Component '%s' not found.\n" % arg )
                 else:
                     comp = self.cn[ arg ]
-                    self.cn.makeTerms(comp, term=term)
+                    self.cn.makeTerm(comp, term=term)
 
     def do_x( self, line ):
         """Create an X11 tunnel to the given component,

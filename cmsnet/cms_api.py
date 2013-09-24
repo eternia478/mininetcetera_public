@@ -707,7 +707,7 @@ class CMSAPI (object):
     comps = temp_comps
 
     for comp in comps:
-      self.net.makeTerms(comp, term='xterm', **kwargs)
+      self.net.makeTerm(comp, term='xterm', **kwargs)
 
   def gterm (self, *comps, **kwargs):
     """
@@ -722,7 +722,7 @@ class CMSAPI (object):
     comps = temp_comps
 
     for comp in comps:
-      self.net.makeTerms(comp, term='gterm', **kwargs)
+      self.net.makeTerm(comp, term='gterm', **kwargs)
 
   def x11 (self, comp, cmd_list=[]):
     """

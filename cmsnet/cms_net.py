@@ -734,7 +734,7 @@ class CMSnet( object ):
                     self.close_controller_connection()
                     self.setup_controller_connection()
 
-    def makeTerms( self, comp, term='xterm', oldmake=False ):
+    def makeTerm( self, comp, term='xterm', oldmake=False ):
         "Spawn terminals for the given component."
         node = comp.node
         new_terms = []
