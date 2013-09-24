@@ -257,6 +257,13 @@ class MininetPatch(Mininet):
             error('dummy node does not exist\n')
             return
         assert isinstance(dummy, Dummy)
+        
+        # Part 2: Check host name.
+        if "inNamespace" in params and not params.get("inNamespace"):
+            if len(hostName) > 13:
+                error_msg = "Name of host %s using public namespace" % name
+                error_msg += " exceeds maximum length of 13."
+                return None, host_terms
 
         # The following corresponds to code in self.build()
 

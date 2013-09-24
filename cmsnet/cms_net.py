@@ -593,8 +593,12 @@ class CMSnet( object ):
                     err = True
                 else:
                     vm = self.createVM(vm_name)
-                    vm.lock_comp_config()
-                    if vm.config_hv_name:
+                    if vm is None:
+                        error("VM %s cannot be created!\n" % (vm_name,))
+                        err = True
+                    else:
+                      vm.lock_comp_config()
+                      if vm.config_hv_name:
                         hv_name = vm.config_hv_name
                         hv = self.nameToComp.get(hv_name)
                         if not hv:
@@ -617,7 +621,7 @@ class CMSnet( object ):
                                 if not vm.is_paused():
                                     error("VM %s not paused!\n" % (vm,))
                                     err = True
-                    vm.unlock_comp_config()
+                      vm.unlock_comp_config()
         if err:
             error("\nError occurred when resuming VMs!\n")
         else:
@@ -833,6 +837,12 @@ class CMSnet( object ):
         if self.mn.built:
             error("Cannot add switch; Mininet already built.")
             return
+        if len(name) > 13:
+            error_msg = "Switch name %s exceeds maximum length of 13." % name
+            error("Cannot build network: %s\n" % error_msg)
+            self.stop()
+            error("Stopping CMSnet. Please manually fix setup.\n")
+            sys.exit(1)
         params.update({"cms_type": "hypervisor"})
         return self.mn.addSwitch(name, cls=cls, **params)
 
@@ -845,6 +855,12 @@ class CMSnet( object ):
         if self.mn.built:
             error("Cannot add switch; Mininet already built.")
             return
+        if len(name) > 13:
+            error_msg = "Switch name %s exceeds maximum length of 13." % name
+            error("Cannot build network: %s\n" % error_msg)
+            self.stop()
+            error("Stopping CMSnet. Please manually fix setup.\n")
+            sys.exit(1)
         params.update({"cms_type": "fabric", "cls": POXNormalSwitch})
         return self.mn.addSwitch(name, **params)
 
@@ -990,6 +1006,8 @@ class CMSnet( object ):
         assert not vm_cls or issubclass(vm_cls, VirtualMachine)
 
         host, host_terms = self.mn.createHostAtDummy(vm_name, **params)
+        if host is None:
+            return None
         if not vm_cls:
             vm_cls = self.vm_cls
         vm = vm_cls(host, vm_script, self.cmsnet_info)
@@ -1023,6 +1041,8 @@ class CMSnet( object ):
         params['inNamespace'] = old_vm.node.inNamespace
 
         new_vm = self.createVM(new_vm_name, vm_script, vm_cls, **params)
+        if new_vm is None:
+            return None
         assert isinstance(new_vm, VirtualMachine)
         old_vm.cloneTo(new_vm)     # Leave complexity in here.
 

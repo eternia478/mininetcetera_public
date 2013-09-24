@@ -439,6 +439,8 @@ class CMSAPI (object):
       raise CMSInvalidChoiceValueError('vm_script', vm_script)
 
     vm = self.net.createVM(vm_name, vm_script, vm_cls, **params)
+    if vm is None:
+      return None
     self.local_vars[vm_name] = vm
     return vm
 
@@ -459,6 +461,8 @@ class CMSAPI (object):
       self._check_vm_name_available(new_vm_name)
 
     vm = self.net.cloneVM(old_vm, new_vm_name)
+    if vm is None:
+      return None
     self.local_vars[vm_name] = vm
     return vm
 

@@ -10,7 +10,7 @@ This package includes code to represent network topologies.
 A Topo object can be a topology database for NOX, can represent a physical
 setup for testing, and can even be emulated with the Mininet package.
 '''
-
+from mininet.log import error, info, output, warn, debug
 from mininet.util import irange, natural, naturalSeq
 from mininet.topo import Topo
 #from mininet.node import POXNormalSwitch
@@ -33,6 +33,10 @@ class CMSTopo(Topo):
            name: HV-switch name
            opts: HV-switch options
            returns: HV-switch name"""
+        if len(name) > 13:
+            error_msg = "Switch name %s exceeds maximum length of 13." % name
+            error("Cannot build topology: %s\n" % error_msg)
+            sys.exit(1)
         opts.update({"cms_type": "hypervisor"})
         result = self.addSwitch(name, **opts)
         return result
@@ -42,6 +46,10 @@ class CMSTopo(Topo):
            name: fabric-switch name
            opts: fabric-switch options
            returns: fabric-switch name"""
+        if len(name) > 13:
+            error_msg = "Switch name %s exceeds maximum length of 13." % name
+            error("Cannot build topology: %s\n" % error_msg)
+            sys.exit(1)
         opts.update({"cms_type": "fabric", "cls": POXNormalSwitch})
         result = self.addSwitch(name, **opts)
         return result
