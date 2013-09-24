@@ -583,31 +583,36 @@ class CMSnet( object ):
         for file_name in config_files:
             if file_name.endswith(vm_config_suffix):
                 vm_name = file_name[:-len(vm_config_suffix)]
-                vm = self.createVM(vm_name)
-                vm.lock_comp_config()
-                if vm.config_hv_name:
-                    hv = self.nameToComp.get(vm.config_hv_name)
-                    if not hv:
-                        error_msg = "%s does not exist." % vm.config_hv_name
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    elif not isinstance(hv, Hypervisor):
-                        error_msg = "%s is not a hypervisor." % hv
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    elif not hv.is_enabled():
-                        error_msg = "%s is not enabled." % hv
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    else:
-                        self.launchVM(vm, hv)
-                    if not vm.is_running():
-                        error("VM %s is not launched!\n" % vm)
-                        err = True
-                    else:
-                        if vm.config_is_paused:
-                            self.pauseVM(vm)
-                            if not vm.is_paused():
-                                error("VM %s is not paused!\n" % vm)
-                                err = True
-                vm.unlock_comp_config()
+                if vm_name in self.mn.nameToNode:
+                    error("Conflict in node name %s.\n" % (vm_name,))
+                    err = True
+                else:
+                    vm = self.createVM(vm_name)
+                    vm.lock_comp_config()
+                    if vm.config_hv_name:
+                        hv_name = vm.config_hv_name
+                        hv = self.nameToComp.get(hv_name)
+                        if not hv:
+                            error_msg = "%s does not exist." % (hv_name,)
+                            error("Cannot run %s: %s\n" % (vm, error_msg))
+                        elif not isinstance(hv, Hypervisor):
+                            error_msg = "%s is not a hypervisor." % (hv,)
+                            error("Cannot run %s: %s\n" % (vm, error_msg))
+                        elif not hv.is_enabled():
+                            error_msg = "%s is not enabled." % (hv,)
+                            error("Cannot run %s: %s\n" % (vm, error_msg))
+                        else:
+                            self.launchVM(vm, hv)
+                        if not vm.is_running():
+                            error("VM %s not launched!\n" % (vm,))
+                            err = True
+                        else:
+                            if vm.config_is_paused:
+                                self.pauseVM(vm)
+                                if not vm.is_paused():
+                                    error("VM %s not paused!\n" % (vm,))
+                                    err = True
+                    vm.unlock_comp_config()
         if err:
             error("\nError occurred when resuming VMs!\n")
         else:
