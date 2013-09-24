@@ -52,7 +52,7 @@ The basic naming scheme is as follows:
     Host nodes are named h1-hN
     Switch nodes are named s1-sN
     Controller nodes are named c0-cN
-    Interfaces are named {nodename}-eth0 .. {nodename}-ethN
+    Interfaces are named {nodename}-0 .. {nodename}-N
 
 Note: If the network topology is created using mininet.topo, then
 node numbers are unique among hosts and switches (e.g. we have
@@ -96,7 +96,7 @@ from itertools import chain
 from mininet.cli import CLI
 from mininet.log import info, warn, error, debug, output
 from mininet.node import Host, Switch#, Dummy, POXNormalSwitch  # Uncomment !!
-from mininet.link import Link, Intf
+#from mininet.link import Link, Intf
 from mininet.util import quietRun, fixLimits, numCores, ensureRoot, moveIntf
 from mininet.util import macColonHex, ipStr, ipParse, netParse, ipAdd
 from mininet.term import cleanUpScreens, makeTerms

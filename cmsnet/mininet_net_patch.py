@@ -332,7 +332,8 @@ class MininetPatch(Mininet):
         intf2_port = node2.newPort()          # For now, just assign new port.
         intf2 = intf1_other
         if not intf2_name:
-            intf2_name = "%s-eth%d" % (node2.name, intf2_port)
+            assert intf2.link != None
+            intf2_name = intf2.link.intfName(node2, intf2_port)
         intf2.rename(intf2_name)
         intf2.node = node2
         node2.intfs[ intf2_port ] = intf2
@@ -388,7 +389,7 @@ class MininetPatch(Mininet):
 
         # Part 2: Extracting dummy information and calling moveLink().
         dummy_intf_port = dummy.newPort()
-        dummy_intf_name = 'dummy-eth' + str(dummy_intf_port)
+        dummy_intf_name = intf.link.intfName(dummy, dummy_intf_port)
         self.moveLink(node, dummy, intf_name, dummy_intf_name)
 
     def swapLink( self, node1, node2, intf1_name=None, intf2_name=None ):

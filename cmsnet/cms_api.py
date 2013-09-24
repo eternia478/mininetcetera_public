@@ -17,7 +17,8 @@ from mininet.node import ( Node, Host, CPULimitedHost,
                            Controller, OVSController, NOX, RemoteController,
                            UserSwitch, OVSLegacyKernelSwitch, OVSKernelSwitch,
                            IVSSwitch )
-from mininet.link import Link, TCLink, Intf
+#from mininet.link import Link, TCLink, Intf
+from mininet.link import Intf
 from mininet.log import info, output, error
 from mininet.term import makeTerms, runX11
 from cmsnet.cms_net import CMSnet
@@ -44,6 +45,7 @@ from cmsnet.cms_exc import ( CMSCompNameError, CMSVMNameError,
 
 from cmsnet.mininet_node_patch import Dummy, POXSwitch, POXNormalSwitch
 from cmsnet.mininet_net_patch import MininetPatch as Mininet
+from cmsnet.mininet_link_patch import Link, TCLink
 
 from mininet.log import setLogLevel
 import code

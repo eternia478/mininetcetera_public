@@ -19,7 +19,7 @@ from mininet.log import info, error, warn, debug
 from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
                            numCores, retry, mountCgroups )
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
-from mininet.link import Link, Intf, TCIntf
+#from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
 
 SWITCH_CONFIG_DIR = os.path.join(os.environ['CONFIG_DIR'], "swconf")
@@ -160,7 +160,7 @@ class POXNGSwitch( Switch ):
         #if self.input_intf_ports:     # Only add specified ports.
         #    if intf_name in self.input_intf_ports:
         #        self.intf_ports.append(intf_name)
-        #else:                         # Add all ()-eth# ports.
+        #else:                         # Add all name-N ports.
         #    if self.name in intf_name:
         #        self.intf_ports.append(intf_name)
         #if self.print_personal_debug:
@@ -396,7 +396,7 @@ class POXSwitch( Switch ):
         if self.input_intf_ports:     # Only add specified ports.
             if intf_name in self.input_intf_ports:
                 self.intf_ports.append(intf_name)
-        else:                         # Add all ()-eth# ports.
+        else:                         # Add all name-N ports.
             if self.name in intf_name:
                 self.intf_ports.append(intf_name)
         if self.print_personal_debug:

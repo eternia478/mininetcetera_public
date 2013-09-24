@@ -25,7 +25,7 @@ from time import sleep
 from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
                            numCores, retry, mountCgroups )
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
-from mininet.link import Link, Intf, TCIntf
+#from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
 
 from cmsnet.cms_log import error, info, output, warn, debug, config_error
@@ -672,7 +672,7 @@ class Hypervisor( CMSComponent ):
         info = {
           'name'         : self.name,
           'dpid'         : self.dpid,
-          'fabric_ports' : [self.name+"-eth1"],
+          'fabric_ports' : [self.name+"-1"],
         }
         return info
 
