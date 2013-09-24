@@ -9,7 +9,7 @@ import os
 # REMEMBER TO ALSO IMPORT THESE IN MININET LATER:
 from mininet.util import moveIntf
 from mininet.node import Switch#, Dummy
-
+import traceback
 
 # Patching. REMOVE AFTER CHANGES TO MININET AND UNCOMMENT ABOVE EDIT.
 from cmsnet.mininet_node_patch import Dummy
@@ -120,6 +120,20 @@ class MininetPatch(Mininet):
         self.terms += makeTerms( self.hosts, 'host' )
 
 
+    def stopXterms( self ):
+        "Kill each xterm."
+        for term in self.terms:
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+            try:
+                os.kill( term.pid, signal.SIGKILL )
+            except:
+                error( traceback.format_exc() + "\n" )
+        #--------------------------------------------------------------------
+        #---------------------------------------------THIS NEEDS TO BE ADDED!
+        self.terms = []
+        #--------------------------------------------------------------------
+        cleanUpScreens()
+
     def stop( self ):
         "Stop the controller(s), switches and hosts"
         if self.terms:
@@ -128,23 +142,41 @@ class MininetPatch(Mininet):
         info( '*** Stopping %i switches\n' % len( self.switches ) )
         for switch in self.switches:
             info( switch.name + ' ' )
-            switch.stop()
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+            try:
+                switch.stop()
+            except:
+                error( traceback.format_exc() + "\n" )
+        #--------------------------------------------------------------------
         info( '\n' )
         info( '*** Stopping %i hosts\n' % len( self.hosts ) )
         for host in self.hosts:
             info( host.name + ' ' )
-            host.terminate()
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+            try:
+                host.terminate()
+            except:
+                error( traceback.format_exc() + "\n" )
+        #--------------------------------------------------------------------
         info( '\n' )
         info( '*** Stopping %i controllers\n' % len( self.controllers ) )
         for controller in self.controllers:
             info( controller.name + ' ' )
-            controller.stop()
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+            try:
+                controller.stop()
+            except:
+                error( traceback.format_exc() + "\n" )
+        #--------------------------------------------------------------------
         #---------------------------------------------THIS NEEDS TO BE ADDED!
         info( '\n' )
         info( '*** Stopping %i dummies\n' % len( self.dummies ) )
         for dummy in self.dummies:
             info( dummy.name + ' ' )
-            dummy.terminate()
+            try:
+                dummy.terminate()
+            except:
+                error( traceback.format_exc() + "\n" )
         #--------------------------------------------------------------------
         info( '\n*** Done\n' )
 

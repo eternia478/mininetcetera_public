@@ -30,6 +30,7 @@ from mininet.node import Node, Host, Switch
 
 from cmsnet.cms_log import error, info, output, warn, debug, config_error
 import shutil
+import traceback
 from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps,
                               makeDirNoErrors, removeNoErrors,
                               isValidMAC, getExpandedIP, isValidIP,
@@ -609,7 +610,11 @@ class VirtualMachine( CMSComponent ):
         if not self.is_running():
             return
         self.lock_comp_config()    # Prevent adjustments to config file.
-        self.stop()
+        self.node.waiting = False  # Prevent any assertion errors.
+        try:
+            self.stop()
+        except:
+            error( traceback.format_exc() + "\n" )
         # self.store_temp_folder()
 
 

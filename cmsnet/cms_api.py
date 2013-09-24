@@ -77,9 +77,13 @@ class CMSAPI (object):
     self.net.mn.addDummy('dummy')
     self.set_net_topo()
     self.net.start()
-
     self.set_cms_commands()
-    code.interact(local=self.local_vars)
+    
+    try:
+      code.interact(local=self.local_vars)
+    finally:
+      self.net.stop()
+      self.net = None
 
   def run (self):
     """

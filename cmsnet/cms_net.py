@@ -155,6 +155,7 @@ class CMSnet( object ):
 
         self.echo_timer = None # Timer that sends echo over CMS channel
 
+        self.cmsnet_stopped = False
         self._allow_write_net_config = False
         self._verbose_script_folder_setup = False
         self.cmsnet_info = {}
@@ -346,6 +347,8 @@ class CMSnet( object ):
 
     def stop( self ):
         "Stop Mininet, VMs, and the connection to the controller."
+        if self.cmsnet_stopped:
+            return
         if self.echo_timer:
             self.echo_timer.cancel()
         self.lock_net_config()
@@ -355,6 +358,7 @@ class CMSnet( object ):
             vm.shutdown()
         self.mn.stop()
         self.unlock_net_config()
+        self.cmsnet_stopped = True
 
     def run( self, test, *args, **kwargs ):
         "Perform a complete start/test/stop cycle."
