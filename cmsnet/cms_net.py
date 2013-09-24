@@ -572,57 +572,65 @@ class CMSnet( object ):
         "Reload vm from vm_name."
         if vm_name in self.mn.nameToNode:
             error("Conflict in node name %s.\n" % (vm_name,))
-            err = True
-        else:
+            return True
+        vm = None
+        try:
             vm = self.createVM(vm_name)
-            if vm is None:
-                error("VM %s cannot be created!\n" % (vm_name,))
-                err = True
+        except Exception,e:
+            error("Cannot create %s: %s\n" % (vm_name, str(e)))
+        if vm is None:
+            error("VM %s cannot be created!\n" % (vm_name,))
+            return True
+        vm.lock_comp_config()
+        if vm.config_hv_name:
+            hv_name = vm.config_hv_name
+            hv = self.nameToComp.get(hv_name)
+            if not hv:
+                error_msg = "%s does not exist." % (hv_name,)
+                error("Cannot run %s: %s\n" % (vm, error_msg))
+            elif not isinstance(hv, Hypervisor):
+                error_msg = "%s is not a hypervisor." % (hv,)
+                error("Cannot run %s: %s\n" % (vm, error_msg))
+            elif not hv.is_enabled():
+                error_msg = "%s is not enabled." % (hv,)
+                error("Cannot run %s: %s\n" % (vm, error_msg))
             else:
-                vm.lock_comp_config()
-                if vm.config_hv_name:
-                    hv_name = vm.config_hv_name
-                    hv = self.nameToComp.get(hv_name)
-                    if not hv:
-                        error_msg = "%s does not exist." % (hv_name,)
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    elif not isinstance(hv, Hypervisor):
-                        error_msg = "%s is not a hypervisor." % (hv,)
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    elif not hv.is_enabled():
-                        error_msg = "%s is not enabled." % (hv,)
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    else:
-                        self.launchVM(vm, hv)
-                    if not vm.is_running():
-                        error("VM %s not launched!\n" % (vm,))
-                        err = True
-                    else:
-                        if vm.config_is_paused:
-                            self.pauseVM(vm)
-                            if not vm.is_paused():
-                                error("VM %s not paused!\n" % (vm,))
-                                err = True
-                vm.unlock_comp_config()
+                try:
+                    self.launchVM(vm, hv)
+                except Exception,e:
+                    error("Cannot run %s: %s\n" % (vm, str(e)))
+            if not vm.is_running():
+                error("VM %s not launched!\n" % (vm,))
+                return True
+        if vm.config_is_paused:
+            try:
+                self.pauseVM(vm)
+            except Exception,e:
+                error("Cannot pause %s: %s\n" % (vm, str(e)))
+            if not vm.is_paused():
+                error("VM %s not paused!\n" % (vm,))
+                return True
+        vm.unlock_comp_config()   # This VM is successfully reloaded.
         return err
 
     def _liststat_old_VMs( self ):
         "List statistics of old VMs that were reloaded."
         launched = []
         paused = []
-        info("\n*** Resumed %i VMs:\n" % len(self.VMs))
+        info("\n")
+        info("*** Resumed %i VMs:\n" % len(self.VMs))
         for vm in self.VMs:
-            info("%s " % vm)
+            info("%s " % (vm,))
             if vm.is_running(): launched.append(vm)
             if vm.is_paused():  paused.append(vm)
         info("\n")
         info("*** Relaunched %i VMs:\n" % len(launched))
         for vm in launched:
-            info("%s " % vm)
+            info("%s " % (vm,))
         info("\n")
         info("*** Repaused %i VMs:\n" % len(paused))
         for vm in paused:
-            info("%s " % vm)
+            info("%s " % (vm,))
         info("\n")
 
     def get_old_VMs( self ):
