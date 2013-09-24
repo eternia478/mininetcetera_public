@@ -247,7 +247,6 @@ class VirtualMachine( CMSComponent ):
         self.check_comp_config()
         self.update_comp_config()
         self.unlock_comp_config()
-        self.IP = self.IP            # Check attribute values again.
 
     @CMSComponent.name.setter
     def name( self, name ):
@@ -377,6 +376,7 @@ class VirtualMachine( CMSComponent ):
 
     @gateway.setter
     def gateway( self, gateway ):
+        is_setting_up = self.is_comp_config_locked() and self.gateway is None
         if gateway is None:
             self.node.cmd( 'ip route del default' )
             self.node.params['defaultRoute'] = None
@@ -387,11 +387,11 @@ class VirtualMachine( CMSComponent ):
             return
         elif not isInSameSubnet(gateway, self.IP, self.netmask):
             msg_args = (gateway, "%s/%s" % (self.IP, self.prefixLen))
-            if not self.is_comp_config_locked():
+            if not is_setting_up:
                 warn(self, "Gateway '%s' not in same subnet as %s." % msg_args)
         default_route = "dev %s via %s" % (self.node.intf(), gateway)
         err = self.node.setDefaultRoute(intf=default_route)
-        if err and not self.is_comp_config_locked():
+        if err and not is_setting_up:
             error(self, err)
             olddr = "dev %s via %s" % (self.node.intf(), self.gateway)
             self.node.setDefaultRoute(intf=olddr)
