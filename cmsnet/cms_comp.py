@@ -239,6 +239,7 @@ class VirtualMachine( CMSComponent ):
         self.config_hv_name = None   # temp holder for HV name in config
         self.config_is_paused = None # temp holder for paused status in config
         self.terms = []              # temp holder for terms to kill on removal
+        self.term_pids = []          # temp holder for term pids to kill
 
         #self.reload_temp_folder()
         self.create_temp_folder()
@@ -553,6 +554,8 @@ class VirtualMachine( CMSComponent ):
         check_script_name = self.get_vm_script_cmd(script_type="check")
         script_name = self.get_vm_script_cmd(script_type=script_type)
         self.write_rc_file()
+        for config_file in [".Xauthority", ".bashrc", ".profile"]:
+            self.node.cmd("cp ~/{1} {0}".format(temp_path, config_file))
 
         init_cmd = "cd {0} && source .cmsnetrc && [ -x \"{1}\" ] && {1}"
         cmd = "{1} >> {0}/log.out 2>> {0}/log.err &"

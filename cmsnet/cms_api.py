@@ -694,7 +694,7 @@ class CMSAPI (object):
   # CMS Other Extra Commands
   #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
-  def xterm (self, *comps):
+  def xterm (self, *comps, **kwargs):
     """
     Spawn xterm(s) for the given component(s).
 
@@ -707,9 +707,9 @@ class CMSAPI (object):
     comps = temp_comps
 
     for comp in comps:
-      self.net.makeTerms(comp, term='xterm')
+      self.net.makeTerms(comp, term='xterm', **kwargs)
 
-  def gterm (self, *comps):
+  def gterm (self, *comps, **kwargs):
     """
     Spawn gnome-terminal(s) for the given component(s).
 
@@ -722,7 +722,7 @@ class CMSAPI (object):
     comps = temp_comps
 
     for comp in comps:
-      self.net.makeTerms(comp, term='gterm')
+      self.net.makeTerms(comp, term='gterm', **kwargs)
 
   def x11 (self, comp, cmd_list=[]):
     """

@@ -99,7 +99,7 @@ from mininet.node import Host, Switch#, Dummy, POXNormalSwitch  # Uncomment !!
 #from mininet.link import Link, Intf
 from mininet.util import quietRun, fixLimits, numCores, ensureRoot, moveIntf
 from mininet.util import macColonHex, ipStr, ipParse, netParse, ipAdd
-from mininet.term import cleanUpScreens, makeTerms
+from mininet.term import cleanUpScreens, makeTerm, tunnelX11
 #from mininet.net import Mininet    # Uncomment later!!!
 
 from cmsnet.cms_comp import CMSComponent, VirtualMachine, Hypervisor
@@ -107,6 +107,7 @@ from cmsnet.cms_log import config_error
 import sys
 import random
 import socket
+import time
 from cmsnet.cms_util import defaultDecoder, jsonprint, jsondumps
 from cmsnet.cms_util import makeDirNoErrors, removeNoErrors, resolvePath
 
@@ -733,12 +734,44 @@ class CMSnet( object ):
                     self.close_controller_connection()
                     self.setup_controller_connection()
 
-    def makeTerms( self, comp, term='xterm' ):
+    def makeTerms( self, comp, term='xterm', oldmake=False ):
         "Spawn terminals for the given component."
-        new_terms = makeTerms( [ comp.node ], term=term )
+        node = comp.node
+        new_terms = []
+        new_term_pids = []
+
+        if oldmake:
+            new_terms = makeTerm( node, term=term )
+        else:
+            title = 'Node'
+            title += ': ' + node.name
+            if not node.inNamespace:
+                title += ' (root)'
+            title = '"%s"' % title
+            cmds = {
+                'xterm': [ 'xterm', '-title', title, '-display' ],
+                'gterm': [ 'gnome-terminal', '--title', title, '--display' ]
+            }
+            if term not in cmds:
+                error( 'invalid terminal type: %s\n' % term )
+                return
+            display, tunnel = tunnelX11( node )
+            if display is None:
+                return
+
+            time.sleep(0.3)
+            cmdarray = cmds[ term ] + [ display, '-e', '"env TERM=ansi bash"' ]
+            err = node.cmd(" ".join(cmdarray) + " &")
+            new_terms = [ tunnel ]
+            if not err:
+                new_term_pids = [ node.lastPid ]
+            else:
+                error(err+"\n")
+
         self.mn.terms += new_terms
         if isinstance(comp, VirtualMachine):
             comp.terms += new_terms
+            comp.term_pids += new_term_pids
 
     def makeX11( self, comp, cmd ):
         "Create an X11 tunnel for the given component."
