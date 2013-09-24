@@ -298,8 +298,8 @@ class VirtualMachine( CMSComponent ):
             self.node.setMAC(oldmac)
         else:
             self.update_comp_config()
-        if self.default_gateway:                         # Re-set table.
-            self.default_gateway = self.default_gateway
+        if self.gateway:                         # Re-set table.
+            self.gateway = self.gateway
 
     @property
     def IP( self ):
@@ -323,9 +323,8 @@ class VirtualMachine( CMSComponent ):
             self.node.setIP(oldip, prefixLen=oldpl)
         else:
             self.update_comp_config()
-        if self.default_gateway:                         # Re-set table.
-            self.default_gateway = self.default_gateway
-
+        if self.gateway:                         # Re-set table.
+            self.gateway = self.gateway
 
     @property
     def prefixLen( self ):
@@ -358,7 +357,15 @@ class VirtualMachine( CMSComponent ):
         self.prefixLen = getPrefixLenFromNetmask(netmask)
 
     @property
-    def default_gateway( self ):
+    def subnet_mask( self ):
+        return self.netmask
+
+    @subnet_mask.setter
+    def subnet_mask( self, subnet_mask ):
+        self.netmask = subnet_mask
+
+    @property
+    def gateway( self ):
         try:
             default_route = self.node.params['defaultRoute']
             default_route_params = default_route.split()
@@ -367,29 +374,37 @@ class VirtualMachine( CMSComponent ):
         except:
             return None
 
-    @default_gateway.setter
-    def default_gateway( self, default_gateway ):
-        if default_gateway is None:
+    @gateway.setter
+    def gateway( self, gateway ):
+        if gateway is None:
             self.node.cmd( 'ip route del default' )
             self.node.params['defaultRoute'] = None
             self.update_comp_config()
             return
-        elif not isValidIP(default_gateway):
-            error(self, "'%s' is not a valid IPv4 address."%(default_gateway,))
+        elif not isValidIP(gateway):
+            error(self, "'%s' is not a valid IPv4 address." % (gateway,))
             return
-        elif not isInSameSubnet(default_gateway, self.IP, self.netmask):
-            msg_args = (default_gateway, "%s/%s" % (self.IP, self.prefixLen))
+        elif not isInSameSubnet(gateway, self.IP, self.netmask):
+            msg_args = (gateway, "%s/%s" % (self.IP, self.prefixLen))
             if not self.is_comp_config_locked():
                 warn(self, "Gateway '%s' not in same subnet as %s." % msg_args)
-        default_route = "dev %s via %s" % (self.node.intf(), default_gateway)
+        default_route = "dev %s via %s" % (self.node.intf(), gateway)
         err = self.node.setDefaultRoute(intf=default_route)
         if err and not self.is_comp_config_locked():
             error(self, err)
-            olddr = "dev %s via %s" % (self.node.intf(), self.default_gateway)
+            olddr = "dev %s via %s" % (self.node.intf(), self.gateway)
             self.node.setDefaultRoute(intf=olddr)
         else:
             self.node.params['defaultRoute'] = default_route
             self.update_comp_config()
+
+    @property
+    def default_gateway( self ):
+        return self.gateway
+
+    @default_gateway.setter
+    def default_gateway( self, default_gateway ):
+        self.gateway = default_gateway
 
     @property
     def hv( self ):
@@ -448,7 +463,7 @@ class VirtualMachine( CMSComponent ):
           'mac_addr'        : self.MAC,
           'ip_addr'         : self.IP,
           'netmask'         : self.netmask,
-          'default_gateway' : self.default_gateway,
+          'gateway'         : self.gateway,
           'hv_dpid'         : self.hv_dpid,
           'hv_port_to_vm'   : self.hv_port_to_vm,
         }
@@ -469,7 +484,7 @@ class VirtualMachine( CMSComponent ):
         config["MAC"] = self.MAC
         config["IP"] = self.IP
         config["netmask"] = self.netmask
-        config["default_gateway"] = self.default_gateway
+        config["gateway"] = self.gateway
         config["config_hv_name"] = self.hv_name
         config["config_is_paused"] = self.is_paused()
 
@@ -512,7 +527,7 @@ class VirtualMachine( CMSComponent ):
           'MAC'             : self.MAC,
           'IP'              : self.IP,
           'NETMASK'         : self.netmask,
-          'DEFAULT_GATEWAY' : self.default_gateway, 
+          'GATEWAY'         : self.gateway,
         }
         default_params.update(self.vm_script_params)
         return default_params

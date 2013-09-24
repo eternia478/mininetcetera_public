@@ -529,10 +529,14 @@ class CMSCLI( Cmd ):
         vm_name = None
         script_arg = None
         script_val = None
-        attr_list = ["MAC", "IP", "netmask", "default_gateway", "vm_script"]
+        attr_list = ["MAC", "IP", "netmask", "gateway", "vm_script"]
         attr_alias = { 
-            "NETMASK" : "netmask",
-            "DEFAULT_GATEWAY" : "default_gateway",
+            "NETMASK"         : "netmask",
+            "subnet_mask"     : "netmask",
+            "SUBNET_MASK"     : "netmask",
+            "GATEWAY"         : "gateway",
+            "default_gateway" : "gateway",
+            "DEFAULT_GATEWAY" : "gateway",
         }
 
         if len(args) == 2:
@@ -573,10 +577,14 @@ class CMSCLI( Cmd ):
         args = line.split()
         vm_name = None
         script_arg = None
-        attr_list = ["MAC", "IP", "netmask", "default_gateway", "vm_script"]
+        attr_list = ["MAC", "IP", "netmask", "gateway", "vm_script"]
         attr_alias = { 
-            "NETMASK" : "netmask",
-            "DEFAULT_GATEWAY" : "default_gateway",
+            "NETMASK"         : "netmask",
+            "subnet_mask"     : "netmask",
+            "SUBNET_MASK"     : "netmask",
+            "GATEWAY"         : "gateway",
+            "default_gateway" : "gateway",
+            "DEFAULT_GATEWAY" : "gateway",
         }
 
         if len(args) == 2:
