@@ -10,7 +10,6 @@ import cmsnet.cms_comp
 import subprocess
 import sys
 import signal
-#import atexit
 
 
 
@@ -89,69 +88,67 @@ grpdir = os.path.join(grpbase, grpname)
 tasksfile = os.path.join(grpdir, "tasks")
   
 def set_cgroup():
-  """Set up Mininet cgroup."""
-  if not makeDirNoErrors(grpbase):
+    """Set up Mininet cgroup."""
+    if not makeDirNoErrors(grpbase):
         sys.exit(1)
-  #if not os.path.isdir(grpbase):
-  #    os.mkdir(grpbase)
-  if not os.listdir(grpbase):
-    cgroup_mount_cmd = "mount -t cgroup -o cpuacct mininet " + grpbase
-    subprocess.call(cgroup_mount_cmd, shell=True)
-    try:
-        with open(os.path.join(grpbase, 'release_agent'), "w") as f:
-            agent = os.path.abspath(os.path.dirname(sys.argv[0]))
-            agent = os.path.join(agent, "cgroup_release_agent")
-            f.write(os.path.join(sys.path[0], agent))
-            f.flush()
-    except IOError,e:
-        error_msg = "Unable to write to cgroup file release_agent"
-        error("%s: %s\n" % (error_msg, str(e)))
-        sys.exit(1)
-    try:
-        with open(os.path.join(grpbase, 'notify_on_release'), "w") as f:
-            f.write('1')
-            f.flush()
-    except IOError,e:
-        error_msg = "Unable to write to cgroup file notify_on_release"
-        error("%s: %s\n" % (error_msg, str(e)))
-        sys.exit(1)
+    #if not os.path.isdir(grpbase):
+    #    os.mkdir(grpbase)
+    if not os.listdir(grpbase):
+        cgroup_mount_cmd = "mount -t cgroup -o cpuacct mininet " + grpbase
+        subprocess.call(cgroup_mount_cmd, shell=True)
+        try:
+            with open(os.path.join(grpbase, 'release_agent'), "w") as f:
+                agent = os.path.abspath(os.path.dirname(sys.argv[0]))
+                agent = os.path.join(agent, "cgroup_release_agent")
+                f.write(os.path.join(sys.path[0], agent))
+                f.flush()
+        except IOError,e:
+            error_msg = "Unable to write to cgroup file release_agent"
+            error("%s: %s\n" % (error_msg, str(e)))
+            sys.exit(1)
+        try:
+            with open(os.path.join(grpbase, 'notify_on_release'), "w") as f:
+                f.write('1')
+                f.flush()
+        except IOError,e:
+            error_msg = "Unable to write to cgroup file notify_on_release"
+            error("%s: %s\n" % (error_msg, str(e)))
+            sys.exit(1)
+        assert os.listdir(grpbase)
 
-  assert os.listdir(grpbase)
-  if not makeDirNoErrors(grpdir):
+    if not makeDirNoErrors(grpdir):
         sys.exit(1)
-  #os.mkdir(grpdir)
-  
-  try:
-      with open(tasksfile, 'w') as f:
-          f.write(str(os.getpid()))
-          f.flush()
-  except IOError,e:
-      error_msg = "Unable to write to cgroup file tasks"
-      error("%s: %s\n" % (error_msg, str(e)))
-      sys.exit(1)
+    #os.mkdir(grpdir)
     
-  #atexit.register(kill_cgroup)
+    try:
+        with open(tasksfile, 'w') as f:
+            f.write(str(os.getpid()))
+            f.flush()
+    except IOError,e:
+        error_msg = "Unable to write to cgroup file tasks"
+        error("%s: %s\n" % (error_msg, str(e)))
+        sys.exit(1)
 
 def kill_cgroup():
-  """Kill off processes forked from Mininet."""
-  pids = []
-  try:
-      with open(tasksfile, 'r') as f:
-          pids = f.read().strip().split("\n")
-  except IOError,e:
-      error_msg = "Unable to read from cgroup tasks file"
-      error("%s: %s\n" % (error_msg, str(e)))
-      sys.exit(1)
-  pids = [int(p) for p in pids]
-  pids = [p for p in pids if p != os.getpid()]
-  #print pids
-
-  for pid in pids:
+    """Kill off processes forked from Mininet."""
+    pids = []
     try:
-        os.kill(pid, signal.SIGKILL)
-    except Exception,e:
-        error_msg = "Unable to kill pid "+str(pid)
+        with open(tasksfile, 'r') as f:
+            pids = f.read().strip().split("\n")
+    except IOError,e:
+        error_msg = "Unable to read from cgroup tasks file"
         error("%s: %s\n" % (error_msg, str(e)))
+        sys.exit(1)
+    pids = [int(p) for p in pids]
+    pids = [p for p in pids if p != os.getpid()]
+    #print pids
+
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except Exception,e:
+            error_msg = "Unable to kill pid "+str(pid)
+            error("%s: %s\n" % (error_msg, str(e)))
 
 
 
