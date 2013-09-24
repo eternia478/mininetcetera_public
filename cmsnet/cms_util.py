@@ -7,6 +7,10 @@ import os
 import shutil
 import socket
 import cmsnet.cms_comp
+import subprocess
+import sys
+import signal
+import atexit
 
 
 
@@ -79,16 +83,18 @@ def resolvePath( *rawargs ):
 
 # Cgroup exiting and cleanup
 
+grpname = "mininet" + str(os.getpid())
+grpbase = "/sys/fs/cgroup/mininet"
+grpdir = os.path.join(grpbase, grpname)
+tasksfile = os.path.join(grpdir, "tasks")
+  
 def set_cgroup():
   """Set up Mininet cgroup."""
-  import sys
-  import subprocess
-  grpname = "mininet" + str(os.getpid())
-  grpbase = "/sys/fs/cgroup/mininet"
   if not os.path.isdir(grpbase):
     os.mkdir(grpbase)
   if not os.listdir(grpbase):
-    subprocess.call("mount -t cgroup -o cpuacct mininet " + grpbase, shell=True)
+    cgroup_mount_cmd = "mount -t cgroup -o cpuacct mininet " + grpbase
+    subprocess.call(cgroup_mount_cmd, shell=True)
     with open(os.path.join(grpbase, 'release_agent'), "w") as f:
       agent = os.path.abspath(os.path.dirname(sys.argv[0]))
       agent = os.path.join(agent, "cgroup_release_agent")
@@ -98,24 +104,25 @@ def set_cgroup():
 
   assert os.listdir(grpbase)
 
-  grpdir = os.path.join(grpbase, grpname)
-  tasksfile = os.path.join(grpdir, "tasks")
   os.mkdir(grpdir)
 
   with open(tasksfile, 'w') as f:
     f.write(str(os.getpid()))
-
-  def kill_cgroup ():
-    pids = open(tasksfile, 'r').read().strip().split("\n")
-    pids = [int(p) for p in pids]
-    pids = [p for p in pids if p != os.getpid()]
-    #print pids
-    import signal
-    for pid in pids:
-      os.kill(pid, signal.SIGKILL)
-
-  import atexit
+    
   atexit.register(kill_cgroup)
+
+def kill_cgroup():
+  """Kill off processes forked from Mininet."""
+  pids = open(tasksfile, 'r').read().strip().split("\n")
+  pids = [int(p) for p in pids]
+  pids = [p for p in pids if p != os.getpid()]
+  #print pids
+
+  for pid in pids:
+    os.kill(pid, signal.SIGKILL)
+
+
+
 
 
 
