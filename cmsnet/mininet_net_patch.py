@@ -235,8 +235,10 @@ class MininetPatch(Mininet):
         if self.debug_flag1:
             info( '*** Adding link: (%s, %s)\n' % ( host.name, dummy.name ) )
         hostPort = host.newPort()
-        dummyPort = dummy.newPort()
-        self.addLink( host, dummy, hostPort, dummyPort )
+        hostIntfName = "host-"+repr(hostPort)
+        if not host.inNamespace:
+            hostIntfName = None     # Use default interface name.
+        self.addLink( host, dummy, port1=hostPort, intfName1=hostIntfName )
 
         # if ( self.inNamespace ):
         #     self.configureControlNetwork()

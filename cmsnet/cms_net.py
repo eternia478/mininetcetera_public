@@ -327,15 +327,15 @@ class CMSnet( object ):
         "Start Mininet, hypervisors, and a connection to the controller."
         self.lock_net_config()
         self.mn.start()
-        self.get_hypervisors()
-        if not self.new_config:
-            err1 = self.get_old_mode_params()
-            err2 = self.get_old_VMs()
-            if err1 or err2:
-                self.stop()
-                error("Stopping CMSnet. Please manually fix config.\n")
-                import sys
-                sys.exit(1)
+        (err1, err2, err3) = (None, None, None)
+        err1 = self.get_hypervisors()
+        if not err1 and not self.new_config:
+            err2 = self.get_old_mode_params()
+            err3 = self.get_old_VMs()
+        if err1 or err2 or err3:
+            self.stop()
+            error("Stopping CMSnet. Please manually fix config.\n")
+            sys.exit(1)
         self.setup_controller_connection()
         self.unlock_net_config()
         self.set_echo_timer()
@@ -510,15 +510,25 @@ class CMSnet( object ):
     def get_hypervisors( self ):
         "Collect all hypervisors."
         # HV don't need loading. Just attach to switch.
+        err = False
         for node_name in self.mn.nameToNode:
             node = self.mn.nameToNode[node_name]
-            if node.params.get("cms_type") == "hypervisor":
-                hv = self.hv_cls(node, self.cmsnet_info)
-                self.HVs.append(hv)
-                self.nameToComp[ node_name ] = hv
-                # If hv still needs config resuming:
-                #    hv.lock_comp_config()
-                #    hv.unlock_comp_config()
+            try:
+                if node.params.get("cms_type") == "hypervisor":
+                    hv = self.hv_cls(node, self.cmsnet_info)
+                    self.HVs.append(hv)
+                    self.nameToComp[ node_name ] = hv
+                    # If hv still needs config resuming:
+                    #    hv.lock_comp_config()
+                    #    hv.unlock_comp_config()
+                    if hv.name == "host":
+                        error("Hypervisor name cannot be 'host'.\n")
+                        err = True
+            except Exception,e:
+                error_args = (node_name, str(e))
+                error("Error binding %s as hypervisor: %s\n" % error_args)
+                err = True
+        return err
 
     def get_old_mode_params( self ):
         "Extract old configuration parameters for VM distribution modes."
