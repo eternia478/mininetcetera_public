@@ -77,6 +77,48 @@ def resolvePath( *rawargs ):
 
 
 
+# Cgroup exiting and cleanup
+
+def set_cgroup():
+  """Set up Mininet cgroup."""
+  import sys
+  import subprocess
+  grpname = "mininet" + str(os.getpid())
+  grpbase = "/sys/fs/cgroup/mininet"
+  if not os.path.isdir(grpbase):
+    os.mkdir(grpbase)
+  if not os.listdir(grpbase):
+    subprocess.call("mount -t cgroup -o cpuacct mininet " + grpbase, shell=True)
+    with open(os.path.join(grpbase, 'release_agent'), "w") as f:
+      agent = os.path.abspath(os.path.dirname(sys.argv[0]))
+      agent = os.path.join(agent, "cgroup_release_agent")
+      f.write(os.path.join(sys.path[0], agent))
+    with open(os.path.join(grpbase, 'notify_on_release'), "w") as f:
+      f.write('1')
+
+  assert os.listdir(grpbase)
+
+  grpdir = os.path.join(grpbase, grpname)
+  tasksfile = os.path.join(grpdir, "tasks")
+  os.mkdir(grpdir)
+
+  with open(tasksfile, 'w') as f:
+    f.write(str(os.getpid()))
+
+  def kill_cgroup ():
+    pids = open(tasksfile, 'r').read().strip().split("\n")
+    pids = [int(p) for p in pids]
+    pids = [p for p in pids if p != os.getpid()]
+    #print pids
+    import signal
+    for pid in pids:
+      os.kill(pid, signal.SIGKILL)
+
+  import atexit
+  atexit.register(kill_cgroup)
+
+
+
 # IP and Mac address formatting and parsing
 
 def bitSum( num ):
