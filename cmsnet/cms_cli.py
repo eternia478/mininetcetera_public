@@ -31,6 +31,7 @@ from select import poll, POLLIN
 import sys
 import time
 
+from mininet.cli import CLI as MininetCLI
 from mininet.log import info, output, error
 from mininet.term import makeTerms, runX11
 from mininet.util import quietRun, isShellBuiltin, dumpNodeConnections
@@ -774,7 +775,22 @@ class CMSCLI( Cmd ):
 
         self.cn.autoexec_script = autoexec_script
 
+    def do_mininet( self, line, cmd_name="mininet" ):
+        "Run the Mininet CLI."
+        args = line.split()
 
+        if len(args) != 0:
+            usage = '%s' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        try:
+            info("Entering Mininet layer.\n")
+            MininetCLI(self.cn.mn)
+        except:
+            pass
+        finally:
+            info("Exited from Mininet layer. Returning to CMSnet.\n")
 
 
 

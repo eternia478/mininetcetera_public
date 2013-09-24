@@ -13,6 +13,7 @@ print "PYTHONPATH   = %s" % os.environ.get( 'PYTHONPATH' )
 print "POX_CORE_DIR = %s" % os.environ.get( 'POX_CORE_DIR' )
 
 #from mininet.net import Mininet, MininetWithControlNet, VERSION
+from mininet.cli import CLI as MininetCLI
 from mininet.node import ( Node, Host, CPULimitedHost,
                            Controller, OVSController, NOX, RemoteController,
                            UserSwitch, OVSLegacyKernelSwitch, OVSKernelSwitch,
@@ -190,6 +191,7 @@ class CMSAPI (object):
       'printVMDistributionMode':  self.printVMDistributionMode,
       'changeVMDistributionMode': self.changeVMDistributionMode,
       'changeCMSMsgLevel':        self.changeCMSMsgLevel,
+      'runMininet':               self.runMininet,
 
       'evictVMsFromHV': self.evictVMsFromHV,
       'invictVMsToHV':  self.invictVMsToHV,
@@ -618,6 +620,13 @@ class CMSAPI (object):
       raise CMSInvalidChoiceValueError('msg_level', msg_level)
 
     self.net.changeCMSMsgLevel(msg_level)
+
+  def runMininet (self):
+    """
+    Run the Mininet CLI.
+    """
+    MininetCLI(self.net.mn)
+
 
 
 
