@@ -57,6 +57,22 @@ class MininetPatch(Mininet):
         Mininet.__init__( self, *args, **kwargs )
 
 
+    def __iter__( self ):
+        "return iterator over nodes"
+        #or dow we want to iterate of the keys i.e. node.name like a dict
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+        for node in self.nameToNode.values():
+            yield node.name
+        #--------------------------------------------------------------------
+
+
+    def __len__( self ):
+        "returns number of nodes in net"
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+        return len(self.nameToNode)
+        #--------------------------------------------------------------------
+
+
     def buildFromTopo( self, topo=None ):
         """Build mininet from a topology object
            At the end of this function, everything should be connected
@@ -134,6 +150,7 @@ class MininetPatch(Mininet):
         self.terms = []
         #--------------------------------------------------------------------
         cleanUpScreens()
+
 
     def stop( self ):
         "Stop the controller(s), switches and hosts"
