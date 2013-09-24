@@ -181,8 +181,8 @@ class CMSnet( object ):
         self.nameToComp = {}   # name to CMSComponent (VM/HV) objects
         self.controller_socket = None
 
-        self.possible_modes = CMSnet.getPossibleVMDistModes()
-        self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
+        self.possible_modes = self.getPossibleVMDistModes()
+        self.possible_levels = self.getPossibleCMSMsgLevels()
         self.setupPossibleScripts()
 
         self.last_hv = None
