@@ -59,8 +59,20 @@ def removeNoErrors( file_path ):
             return False
     return True
 
-def resolvePath( *args ):
+def resolvePath( *rawargs ):
     """Resolve the absolute path given the arguments"""
+    is_abspath = True
+    args = []
+    for p in rawargs:
+        p = p.strip()
+        if is_abspath:
+            if p != "":
+                is_abspath = False
+                args.append(p)
+        else:
+            if p is not None:
+                p = p.strip("/")
+                args.append(p)
     return os.path.abspath(os.path.expanduser(os.path.join("", *args)))
 
 
