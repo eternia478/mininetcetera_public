@@ -3,6 +3,7 @@ from mininet.log import info, error, debug, warn
 from mininet.node import Host
 from mininet.term import cleanUpScreens, makeTerms
 import os
+import signal
 
 
 
