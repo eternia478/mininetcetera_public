@@ -567,6 +567,63 @@ class CMSnet( object ):
         if err:
             error("\nError occurred when getting vm_dist_mode parameters!\n")
         return err
+        
+    def _reload_old_VM( self, vm_name, err=False ):
+        "Reload vm from vm_name."
+        if vm_name in self.mn.nameToNode:
+            error("Conflict in node name %s.\n" % (vm_name,))
+            err = True
+        else:
+            vm = self.createVM(vm_name)
+            if vm is None:
+                error("VM %s cannot be created!\n" % (vm_name,))
+                err = True
+            else:
+                vm.lock_comp_config()
+                if vm.config_hv_name:
+                    hv_name = vm.config_hv_name
+                    hv = self.nameToComp.get(hv_name)
+                    if not hv:
+                        error_msg = "%s does not exist." % (hv_name,)
+                        error("Cannot run %s: %s\n" % (vm, error_msg))
+                    elif not isinstance(hv, Hypervisor):
+                        error_msg = "%s is not a hypervisor." % (hv,)
+                        error("Cannot run %s: %s\n" % (vm, error_msg))
+                    elif not hv.is_enabled():
+                        error_msg = "%s is not enabled." % (hv,)
+                        error("Cannot run %s: %s\n" % (vm, error_msg))
+                    else:
+                        self.launchVM(vm, hv)
+                    if not vm.is_running():
+                        error("VM %s not launched!\n" % (vm,))
+                        err = True
+                    else:
+                        if vm.config_is_paused:
+                            self.pauseVM(vm)
+                            if not vm.is_paused():
+                                error("VM %s not paused!\n" % (vm,))
+                                err = True
+                vm.unlock_comp_config()
+        return err
+
+    def _liststat_old_VMs( self ):
+        "List statistics of old VMs that were reloaded."
+        launched = []
+        paused = []
+        info("\n*** Resumed %i VMs:\n" % len(self.VMs))
+        for vm in self.VMs:
+            info("%s " % vm)
+            if vm.is_running(): launched.append(vm)
+            if vm.is_paused():  paused.append(vm)
+        info("\n")
+        info("*** Relaunched %i VMs:\n" % len(launched))
+        for vm in launched:
+            info("%s " % vm)
+        info("\n")
+        info("*** Repaused %i VMs:\n" % len(paused))
+        for vm in paused:
+            info("%s " % vm)
+        info("\n")
 
     def get_old_VMs( self ):
         "Collect all previously saved VMs."
@@ -588,59 +645,11 @@ class CMSnet( object ):
         for file_name in config_files:
             if file_name.endswith(vm_config_suffix):
                 vm_name = file_name[:-len(vm_config_suffix)]
-                if vm_name in self.mn.nameToNode:
-                    error("Conflict in node name %s.\n" % (vm_name,))
-                    err = True
-                else:
-                    vm = self.createVM(vm_name)
-                    if vm is None:
-                        error("VM %s cannot be created!\n" % (vm_name,))
-                        err = True
-                    else:
-                      vm.lock_comp_config()
-                      if vm.config_hv_name:
-                        hv_name = vm.config_hv_name
-                        hv = self.nameToComp.get(hv_name)
-                        if not hv:
-                            error_msg = "%s does not exist." % (hv_name,)
-                            error("Cannot run %s: %s\n" % (vm, error_msg))
-                        elif not isinstance(hv, Hypervisor):
-                            error_msg = "%s is not a hypervisor." % (hv,)
-                            error("Cannot run %s: %s\n" % (vm, error_msg))
-                        elif not hv.is_enabled():
-                            error_msg = "%s is not enabled." % (hv,)
-                            error("Cannot run %s: %s\n" % (vm, error_msg))
-                        else:
-                            self.launchVM(vm, hv)
-                        if not vm.is_running():
-                            error("VM %s not launched!\n" % (vm,))
-                            err = True
-                        else:
-                            if vm.config_is_paused:
-                                self.pauseVM(vm)
-                                if not vm.is_paused():
-                                    error("VM %s not paused!\n" % (vm,))
-                                    err = True
-                      vm.unlock_comp_config()
+                err = self._reload_old_VM(vm_name, err)
         if err:
             error("\nError occurred when resuming VMs!\n")
         else:
-            launched = []
-            paused = []
-            info("\n*** Resumed %i VMs:\n" % len(self.VMs))
-            for vm in self.VMs:
-                info("%s " % vm)
-                if vm.is_running(): launched.append(vm)
-                if vm.is_paused():  paused.append(vm)
-            info("\n")
-            info("*** Relaunched %i VMs:\n" % len(launched))
-            for vm in launched:
-                info("%s " % vm)
-            info("\n")
-            info("*** Repaused %i VMs:\n" % len(paused))
-            for vm in paused:
-                info("%s " % vm)
-            info("\n")
+            self._liststat_old_VMs()
         self.last_hv = orig_last_hv
         self.debug_flag1 = orig_debug_flag1
         self.mn.debug_flag1 = orig_mn_debug_flag1
