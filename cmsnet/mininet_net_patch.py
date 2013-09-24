@@ -100,7 +100,7 @@ class MininetPatch(Mininet):
             params = topo.linkInfo( srcName, dstName )
             srcPort, dstPort = topo.port( srcName, dstName )
             self.addLink( src, dst, srcPort, dstPort, **params )
-            info( '(%s, %s) ' % ( src.name, dst.name ) )
+            info( '(%s.%s, %s.%s) ' % ( src.name, srcPort, dst.name, dstPort ) )
 
         info( '\n' )
 

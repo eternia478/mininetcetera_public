@@ -118,7 +118,7 @@ class POXNGSwitch( Switch ):
         if not os.path.isdir(logdir):
           os.mkdir(logdir)
         logfile = os.path.join(logdir, "%s.log" % (self.name,))
-        args.append("log --file=%s,w" % logfile)
+        #args.append("log --file=%s,w" % logfile)
 
         args.append("ng.dp")
         args.append("--address=%s" % self.controller_ip)
@@ -128,6 +128,9 @@ class POXNGSwitch( Switch ):
         args.append("ng.dp.netdevs")
         args.append('--devices="s%s-*"' % self.real_dpid)
         #OR use self.intf_ports
+
+        args.append(">> " + logfile)
+        args.append("2>> " + logfile)
 
         self.command = " ".join(args)
         #if self.print_personal_debug: print "EVAL: " + self.command

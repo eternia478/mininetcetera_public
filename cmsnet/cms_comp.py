@@ -246,6 +246,7 @@ class VirtualMachine( CMSComponent ):
         self.check_comp_config()
         self.update_comp_config()
         self.unlock_comp_config()
+        self.IP = self.IP            # Check attribute values again.
 
     @CMSComponent.name.setter
     def name( self, name ):
@@ -378,10 +379,11 @@ class VirtualMachine( CMSComponent ):
             return
         elif not isInSameSubnet(default_gateway, self.IP, self.netmask):
             msg_args = (default_gateway, "%s/%s" % (self.IP, self.prefixLen))
-            warn(self, "Gateway '%s' not in same subnet as %s." % msg_args)
+            if not self.is_comp_config_locked():
+                warn(self, "Gateway '%s' not in same subnet as %s." % msg_args)
         default_route = "dev %s via %s" % (self.node.intf(), default_gateway)
         err = self.node.setDefaultRoute(intf=default_route)
-        if err:
+        if err and not self.is_comp_config_locked():
             error(self, err)
             olddr = "dev %s via %s" % (self.node.intf(), self.default_gateway)
             self.node.setDefaultRoute(intf=olddr)
@@ -651,7 +653,7 @@ class Hypervisor( CMSComponent ):
 
     @property
     def dpid( self ):
-        return self.node.dpid
+        return getattr(self.node, 'real_dpid', self.node.dpid)
 
     @dpid.setter
     def dpid( self, dpid ):
