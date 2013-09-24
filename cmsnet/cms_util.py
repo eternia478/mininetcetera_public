@@ -82,11 +82,9 @@ def resolvePath( *rawargs ):
 
 # Cgroup exiting and cleanup
 
-grpname = "mininet" + str(os.getpid())
 grpbase = "/sys/fs/cgroup/mininet"
-grpdir = os.path.join(grpbase, grpname)
-tasksfile = os.path.join(grpdir, "tasks")
-  
+grpname = "mininet" + str(os.getpid())
+
 def write_or_exit(file_name, content):
     """Write intended content to file, or exit due to failure."""
     try:
@@ -102,8 +100,6 @@ def set_cgroup():
     """Set up Mininet cgroup."""
     if not makeDirNoErrors(grpbase):
         sys.exit(1)
-    #if not os.path.isdir(grpbase):
-    #    os.mkdir(grpbase)
     if not os.listdir(grpbase):
         cgroup_mount_cmd = "mount -t cgroup -o cpuacct mininet " + grpbase
         subprocess.call(cgroup_mount_cmd, shell=True)
@@ -112,25 +108,24 @@ def set_cgroup():
         write_or_exit('release_agent', os.path.join(sys.path[0], agent))
         write_or_exit('notify_on_release', '1')
         assert os.listdir(grpbase)
+    grpdir = os.path.join(grpbase, grpname)
     if not makeDirNoErrors(grpdir):
         sys.exit(1)
-    #os.mkdir(grpdir)
     write_or_exit(os.path.join(grpname, "tasks"), str(os.getpid()))
 
 def kill_cgroup():
     """Kill off processes forked from Mininet."""
     pids = []
+    tasksfile = os.path.join(grpbase, grpname, "tasks")
     try:
         with open(tasksfile, 'r') as f:
             pids = f.read().strip().split("\n")
     except IOError,e:
         error_msg = "Unable to read from cgroup tasks file"
         error("%s: %s\n" % (error_msg, str(e)))
-        sys.exit(1)
-    pids = [int(p) for p in pids]
-    pids = [p for p in pids if p != os.getpid()]
+        return
+    pids = [int(p) for p in pids if int(p) != os.getpid()]
     #print pids
-
     for pid in pids:
         try:
             os.kill(pid, signal.SIGKILL)
