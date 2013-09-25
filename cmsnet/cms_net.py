@@ -94,8 +94,8 @@ from time import sleep
 from itertools import chain
 
 from mininet.cli import CLI
-from mininet.log import info, warn, error, debug, output
-from mininet.node import Host, Switch#, Dummy, POXNormalSwitch  # Uncomment !!
+from mininet.log import info, warn, error, debug, output       # Uncomment !!
+from mininet.node import Host, Switch#, Dummy, POXNormalSwitch, POXNGSwitch
 #from mininet.link import Link, Intf
 from mininet.util import quietRun, fixLimits, numCores, ensureRoot, moveIntf
 from mininet.util import macColonHex, ipStr, ipParse, netParse, ipAdd
@@ -117,7 +117,7 @@ import cmsnet.cms_comp
 import cmsnet.cms_topo
 
 # Patching. REMOVE AFTER CHANGES TO MININET AND UNCOMMENT ABOVE EDIT.
-from cmsnet.mininet_node_patch import Dummy, POXNormalSwitch
+from cmsnet.mininet_node_patch import Dummy, POXNormalSwitch, POXNGSwitch
 from cmsnet.mininet_net_patch import MininetPatch as Mininet
 import cmsnet.mininet_net_patch
 
@@ -1356,23 +1356,24 @@ class CMSnet( object ):
             self.stopVM(vm)
         hv.disable()
 
-    def resetHV( self, hv, dokillVM=False ):
+    def resetHV( self, hv, NGSwitches=True ):
         "Reset a specific hv."
         # Stopping or pausing VMs on HV
+        if NGSwitches:
+            if isinstance(hv.node, POXNGSwitch):
+                hv.node._kill_pox_switch()
+                hv.node._run_pox_switch()
+                info("Reset POXNGSwitch %s.\n" % hv.name)
+                return
+            error("%s is not a POXNGSwitch.\n" % hv.name)
+            return
+
         running_vms = []
-        paused_vms = []
         for vm in hv.nameToVMs.values():
             assert vm.is_running()
-            if dokillVM:
+            if not vm.is_paused():
+                self.pauseVM(vm)
                 running_vms.append(vm)
-                if vm.is_paused():
-                    paused_vms.append(vm)
-            else:
-                if not vm.is_paused():
-                    self.pauseVM(vm)
-                    running_vms.append(vm)
-        if dokillVM:
-            self.killHV(hv)
 
         # Obtain underlying HV and fabric switch nodes and intfs info
         # Note: We assume that HV have a unique default interface to fabric.
@@ -1393,10 +1394,8 @@ class CMSnet( object ):
         fabricintf_port = fabricnode.ports[fabricintf]
 
         # Detach interfaces and stop hv switch, then delete from tables
-        hvnode.detach(hvintf)
-        info("Fabric: ")
         fabricnode.detach(fabricintf)
-        info("\n")
+        hvnode.detach(hvintf)
         hvnode.stop()
         # Note: This part is added because Mininet doesn't do this cleanup.
         del hvnode.intfs[hvintf_port]
@@ -1420,25 +1419,27 @@ class CMSnet( object ):
             new_fabricintf = new_hvintf.link.intf1
         assert new_fabricintf.node == fabricnode
         hvnode.attach(new_hvintf)
-        info("Fabric: ")
         fabricnode.attach(new_fabricintf)
-        info("\n")
         hvnode.start(self.mn.controllers)
 
         # Return status of VMs
-        if dokillVM:
-            for vm in running_vms+paused_vms:
-                self.launchVM(vm, hv)
-            for vm in paused_vms:
-                self.pauseVM(vm)
-        else:
-            for vm in running_vms:
-                self.resumeVM(vm)
+        for vm in running_vms:
+            self.resumeVM(vm)
 
         # Actively send sync (is this necessary? I guess, to set rules.)
         self.send_sync()
+        info("Reset %s %s.\n" % (hv.__class__.__name__, hv.name))
 
-    def resetAllHVs( self ):
+    def resetAllHVs( self, NGSwitches=True ):
         "Reset all hvs."
-        print "NOT IMPLEMENTED."
-        return
+        if NGSwitches:
+            ng_switches = []
+            for hv in self.HVs:
+                if isinstance(hv.node, POXNGSwitch):
+                    hv.node._kill_pox_switch()
+                    hv.node._run_pox_switch()
+                    ng_switches.append(hv.name)
+            info("Reset all POXNGSwitches: %s\n" % " ".join(ng_switches))
+            return
+        for hv in self.HVs:
+            self.resetHV(hv, NGSwitches=False)
