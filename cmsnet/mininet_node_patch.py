@@ -22,9 +22,7 @@ from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
 #from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
 
-SWITCH_CONFIG_DIR = os.path.join(os.environ['CONFIG_DIR'], "swconf")
-if not os.path.isdir(SWITCH_CONFIG_DIR):
-  os.mkdir(SWITCH_CONFIG_DIR)
+
 
 class PlainSwitch ( Switch ):
     def attach( self, intf ):
@@ -35,6 +33,9 @@ class PlainSwitch ( Switch ):
 
     def start( self, controllers ):
         print self, "start", controllers
+        SWITCH_CONFIG_DIR = os.path.join(os.environ['CONFIG_DIR'], "swconf")
+        if not os.path.isdir(SWITCH_CONFIG_DIR):
+          os.mkdir(SWITCH_CONFIG_DIR)
         self.cmd("cd", SWITCH_CONFIG_DIR)
 
     def stop( self ):
@@ -69,7 +70,7 @@ class POXNGSwitch( Switch ):
 
         if 'POX_CORE_DIR' not in os.environ:
             self.poxCoreDir = os.path.join(os.path.expanduser("~"), "pox")
-            warn("POX_CORE_DIR is not set; using " + self.poxCoreDir)
+            warn("POX_CORE_DIR is not set; using " + self.poxCoreDir + "\n")
         else:
             self.poxCoreDir = os.environ[ 'POX_CORE_DIR' ]
         if not os.path.isdir(self.poxCoreDir):
@@ -138,7 +139,7 @@ class POXNGSwitch( Switch ):
     def _run_pox_switch( self ):
         "Run the POX switch"
         if self.pox_pid is not None:
-            warn( "Killing old pox switch to restart new one." )
+            warn( "Killing old pox switch to restart new one.\n" )
             self._kill_pox_switch()
         self._build_cmd_args()
         self.cmd( self.command + " &", printPid=True )
@@ -148,7 +149,7 @@ class POXNGSwitch( Switch ):
     def _kill_pox_switch( self ):
         "Kill the POX switch"
         if self.pox_pid is None:
-            error( "No pox switch process to kill" )
+            error( "No pox switch process to kill.\n" )
             return
         #if self.print_personal_debug: print "KILL: process %d" % self.pox_pid
         self.cmd( 'kill %d' % self.pox_pid )
@@ -206,7 +207,7 @@ class POXNGSwitch( Switch ):
         ## Add controllers.
         ## NOTE: This case is currently impossible and inaccessible.
         #if not self.controller_ip or not self.controller_port:
-        #    warn( 'warning: bad input controller ip and port' )
+        #    warn( 'warning: bad input controller ip and port\n' )
         #    if len(controllers) == 1:
         #        c = controllers[0]
         #        self.controller_ip = c.IP()
@@ -295,7 +296,7 @@ class POXSwitch( Switch ):
 
         if 'POX_CORE_DIR' not in os.environ:
             self.poxCoreDir = os.path.join(os.path.expanduser("~"), "pox")
-            warn("POX_CORE_DIR is not set; using " + self.poxCoreDir)
+            warn("POX_CORE_DIR is not set; using " + self.poxCoreDir + "\n")
         else:
             self.poxCoreDir = os.environ[ 'POX_CORE_DIR' ]
         if not os.path.isdir(self.poxCoreDir):
@@ -374,7 +375,7 @@ class POXSwitch( Switch ):
     def _run_pox_switch( self ):
         "Run the POX switch"
         if self.pox_pid is not None:
-            warn( "Killing old pox switch to restart new one." )
+            warn( "Killing old pox switch to restart new one.\n" )
             self._kill_pox_switch()
         self._build_cmd_args()
         self.cmd( self.command, printPid=True )
@@ -384,7 +385,7 @@ class POXSwitch( Switch ):
     def _kill_pox_switch( self ):
         "Kill the POX switch"
         if self.pox_pid is None:
-            error( "No pox switch process to kill" )
+            error( "No pox switch process to kill.\n" )
             return
         if self.print_personal_debug: print "KILL: process %d" % self.pox_pid
         self.cmd( 'kill %d' % self.pox_pid )
@@ -439,7 +440,7 @@ class POXSwitch( Switch ):
         # Add controllers.
         # NOTE: This case is currently impossible and inaccessible.
         if not self.controller_ip or not self.controller_port:
-            warn( 'warning: bad input controller ip and port' )
+            warn( 'warning: bad input controller ip and port\n' )
             if len(controllers) == 1:
                 c = controllers[0]
                 self.controller_ip = c.IP()
