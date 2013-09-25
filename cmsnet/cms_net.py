@@ -567,7 +567,7 @@ class CMSnet( object ):
         if err:
             error("\nError occurred when getting vm_dist_mode parameters!\n")
         return err
-        
+
     def _reload_old_VM( self, vm_name, err=False ):
         "Reload vm from vm_name."
         if vm_name in self.mn.nameToNode:
@@ -823,7 +823,7 @@ class CMSnet( object ):
         self._verbose_script_folder_setup = True
         if self.script_folder is not None:
             return      # Already successfully setup.
-        for pypath in sys.path:        
+        for pypath in sys.path:
             try:
                 if not pypath: pypath = "."
                 self.script_folder = resolvePath(pypath, "cmsnet")
@@ -1355,3 +1355,90 @@ class CMSnet( object ):
         for vm in hv.nameToVMs.values():
             self.stopVM(vm)
         hv.disable()
+
+    def resetHV( self, hv, dokillVM=False ):
+        "Reset a specific hv."
+        # Stopping or pausing VMs on HV
+        running_vms = []
+        paused_vms = []
+        for vm in hv.nameToVMs.values():
+            assert vm.is_running()
+            if dokillVM:
+                running_vms.append(vm)
+                if vm.is_paused():
+                    paused_vms.append(vm)
+            else:
+                if not vm.is_paused():
+                    self.pauseVM(vm)
+                    running_vms.append(vm)
+        if dokillVM:
+            self.killHV(hv)
+
+        # Obtain underlying HV and fabric switch nodes and intfs info
+        # Note: We assume that HV have a unique default interface to fabric.
+        hvnode = hv.node
+        hvintf = hvnode.intfs[1]
+        # Note: hv.node.intf() doesn't work since switch.defaultIntf = lo.
+        assert hvintf is not None
+        hvintf_name = hvintf.name
+        hvintf_port = hvnode.ports[hvintf]
+        assert hvintf.link is not None
+        assert hvintf in [hvintf.link.intf1, hvintf.link.intf2]
+        if hvintf == hvintf.link.intf1:
+            fabricintf = hvintf.link.intf2
+        elif hvintf == hvintf.link.intf2:
+            fabricintf = hvintf.link.intf1
+        fabricnode = fabricintf.node
+        fabricintf_name = fabricintf.name
+        fabricintf_port = fabricnode.ports[fabricintf]
+
+        # Detach interfaces and stop hv switch, then delete from tables
+        hvnode.detach(hvintf)
+        info("Fabric: ")
+        fabricnode.detach(fabricintf)
+        info("\n")
+        hvnode.stop()
+        # Note: This part is added because Mininet doesn't do this cleanup.
+        del hvnode.intfs[hvintf_port]
+        del hvnode.ports[hvintf]
+        del hvnode.nameToIntf[hvintf_name]
+        del fabricnode.intfs[fabricintf_port]
+        del fabricnode.ports[fabricintf]
+        del fabricnode.nameToIntf[fabricintf_name]
+
+        # Restart link, attach interfaces, and restart the switch.
+        self.mn.addLink(hvnode, fabricnode)
+        new_hvintf = hvnode.intfs[1]
+        # Note: hv.node.intf() doesn't work since switch.defaultIntf = lo.
+        # Note: It may be better to refactor this later.
+        assert new_hvintf is not None
+        assert new_hvintf.link is not None
+        assert new_hvintf in [new_hvintf.link.intf1, new_hvintf.link.intf2]
+        if new_hvintf == new_hvintf.link.intf1:
+            new_fabricintf = new_hvintf.link.intf2
+        elif new_hvintf == new_hvintf.link.intf2:
+            new_fabricintf = new_hvintf.link.intf1
+        assert new_fabricintf.node == fabricnode
+        hvnode.attach(new_hvintf)
+        info("Fabric: ")
+        fabricnode.attach(new_fabricintf)
+        info("\n")
+        hvnode.start(self.mn.controllers)
+
+        # Return status of VMs
+        if dokillVM:
+            for vm in running_vms+paused_vms:
+                self.launchVM(vm, hv)
+            for vm in paused_vms:
+                self.pauseVM(vm)
+        else:
+            for vm in running_vms:
+                self.resumeVM(vm)
+
+        # Actively send sync (is this necessary? I guess, to set rules.)
+        self.send_sync()
+
+    def resetAllHVs( self ):
+        "Reset all hvs."
+        print "NOT IMPLEMENTED."
+        return
