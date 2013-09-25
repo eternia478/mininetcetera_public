@@ -1363,6 +1363,7 @@ class CMSnet( object ):
             if isinstance(hv.node, POXNGSwitch):
                 hv.node._kill_pox_switch()
                 hv.node._run_pox_switch()
+                #hv.node.start(self.mn.controllers)
                 info("Reset POXNGSwitch %s.\n" % hv.name)
                 return
             error("%s is not a POXNGSwitch.\n" % hv.name)

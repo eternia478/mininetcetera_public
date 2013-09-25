@@ -198,6 +198,8 @@ class CMSAPI (object):
       'enableHV':       self.enableHV,
       'disableHV':      self.disableHV,
       'killHV':         self.killHV,
+      'resetHV':        self.resetHV,
+      'resetAllHVs':    self.resetAllHVs,
 
       'xterm':    self.xterm,
       'gterm':    self.gterm,
@@ -246,6 +248,8 @@ class CMSAPI (object):
       'kill':    self.killHV,
       'crashHV': self.killHV,
       'crash':   self.killHV,
+      'reset':   self.resetHV,
+      'resal':   self.resetAllHVs,
     }
     return method_aliases
 
@@ -696,6 +700,26 @@ class CMSAPI (object):
     self._check_hv(hv, exp_enabled=True)
 
     self.net.killHV(hv)
+
+  def resetHV (self, hv, NGSwitches=True):
+    """
+    Reset a hypervisor. This allows debugging switch software to be refreshed.
+
+    hv: Hypervisor instance/name to reset.
+    NGSwitches: Whether the hypervisor's switch is a POX NG switch or not.
+    """
+    hv = self._get_hv(hv)
+    self._check_hv(hv)
+
+    self.net.resetHV(hv, NGSwitches=NGSwitches)
+  
+  def resetAllHVs (self, NGSwitches=True):
+    """
+    Reset all hypervisors (or just those of the specific nature).
+
+    NGSwitches: Whether the hypervisor's switch is a POX NG switch or not.
+    """
+    self.net.resetAllHVs(NGSwitches=NGSwitches)
 
 
 

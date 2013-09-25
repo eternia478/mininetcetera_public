@@ -903,6 +903,27 @@ class CMSCLI( Cmd ):
 
         if not err:
             self.cn.killHV(hv)
+            
+    def do_reset( self, line, cmd_name='reset' ):
+        "Reset a hypervisor."
+        args = line.split()
+        hv_name = None
+
+        if len(args) == 1:
+            hv_name = args[0]
+        else:
+            usage = '%s hv_name|all' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        if hv_name == "all":
+            self.cn.resetAllHVs()
+            return
+
+        err, hv = self._check_hv_name(hv_name)
+
+        if not err:
+            self.cn.resetHV(hv)
 
 
 
