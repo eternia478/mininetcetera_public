@@ -13,11 +13,13 @@ print "PYTHONPATH   = %s" % os.environ.get( 'PYTHONPATH' )
 print "POX_CORE_DIR = %s" % os.environ.get( 'POX_CORE_DIR' )
 
 #from mininet.net import Mininet, MininetWithControlNet, VERSION
+from mininet.cli import CLI as MininetCLI
 from mininet.node import ( Node, Host, CPULimitedHost,
                            Controller, OVSController, NOX, RemoteController,
                            UserSwitch, OVSLegacyKernelSwitch, OVSKernelSwitch,
                            IVSSwitch )
-from mininet.link import Link, TCLink, Intf
+#from mininet.link import Link, TCLink, Intf
+from mininet.link import Intf
 from mininet.log import info, output, error
 from mininet.term import makeTerms, runX11
 from cmsnet.cms_net import CMSnet
@@ -44,6 +46,7 @@ from cmsnet.cms_exc import ( CMSCompNameError, CMSVMNameError,
 
 from cmsnet.mininet_node_patch import Dummy, POXSwitch, POXNormalSwitch
 from cmsnet.mininet_net_patch import MininetPatch as Mininet
+from cmsnet.mininet_link_patch import Link, TCLink
 
 from mininet.log import setLogLevel
 import code
@@ -75,9 +78,13 @@ class CMSAPI (object):
     self.net.mn.addDummy('dummy')
     self.set_net_topo()
     self.net.start()
-
     self.set_cms_commands()
-    code.interact(local=self.local_vars)
+    
+    try:
+      code.interact(local=self.local_vars)
+    finally:
+      self.net.stop()
+      self.net = None
 
   def run (self):
     """
@@ -184,12 +191,15 @@ class CMSAPI (object):
       'printVMDistributionMode':  self.printVMDistributionMode,
       'changeVMDistributionMode': self.changeVMDistributionMode,
       'changeCMSMsgLevel':        self.changeCMSMsgLevel,
+      'runMininet':               self.runMininet,
 
       'evictVMsFromHV': self.evictVMsFromHV,
       'invictVMsToHV':  self.invictVMsToHV,
       'enableHV':       self.enableHV,
       'disableHV':      self.disableHV,
       'killHV':         self.killHV,
+      'resetHV':        self.resetHV,
+      'resetAllHVs':    self.resetAllHVs,
 
       'xterm':    self.xterm,
       'gterm':    self.gterm,
@@ -238,6 +248,8 @@ class CMSAPI (object):
       'kill':    self.killHV,
       'crashHV': self.killHV,
       'crash':   self.killHV,
+      'reset':   self.resetHV,
+      'resal':   self.resetAllHVs,
     }
     return method_aliases
 
@@ -433,6 +445,8 @@ class CMSAPI (object):
       raise CMSInvalidChoiceValueError('vm_script', vm_script)
 
     vm = self.net.createVM(vm_name, vm_script, vm_cls, **params)
+    if vm is None:
+      return None
     self.local_vars[vm_name] = vm
     return vm
 
@@ -453,6 +467,8 @@ class CMSAPI (object):
       self._check_vm_name_available(new_vm_name)
 
     vm = self.net.cloneVM(old_vm, new_vm_name)
+    if vm is None:
+      return None
     self.local_vars[vm_name] = vm
     return vm
 
@@ -609,6 +625,13 @@ class CMSAPI (object):
 
     self.net.changeCMSMsgLevel(msg_level)
 
+  def runMininet (self):
+    """
+    Run the Mininet CLI.
+    """
+    MininetCLI(self.net.mn)
+
+
 
 
 
@@ -678,6 +701,26 @@ class CMSAPI (object):
 
     self.net.killHV(hv)
 
+  def resetHV (self, hv, NGSwitches=True):
+    """
+    Reset a hypervisor. This allows debugging switch software to be refreshed.
+
+    hv: Hypervisor instance/name to reset.
+    NGSwitches: Whether the hypervisor's switch is a POX NG switch or not.
+    """
+    hv = self._get_hv(hv)
+    self._check_hv(hv)
+
+    self.net.resetHV(hv, NGSwitches=NGSwitches)
+  
+  def resetAllHVs (self, NGSwitches=True):
+    """
+    Reset all hypervisors (or just those of the specific nature).
+
+    NGSwitches: Whether the hypervisor's switch is a POX NG switch or not.
+    """
+    self.net.resetAllHVs(NGSwitches=NGSwitches)
+
 
 
 
@@ -688,7 +731,7 @@ class CMSAPI (object):
   # CMS Other Extra Commands
   #~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 
-  def xterm (self, *comps):
+  def xterm (self, *comps, **kwargs):
     """
     Spawn xterm(s) for the given component(s).
 
@@ -701,9 +744,9 @@ class CMSAPI (object):
     comps = temp_comps
 
     for comp in comps:
-      self.net.makeTerms(comp, term='xterm')
+      self.net.makeTerm(comp, term='xterm', **kwargs)
 
-  def gterm (self, *comps):
+  def gterm (self, *comps, **kwargs):
     """
     Spawn gnome-terminal(s) for the given component(s).
 
@@ -716,7 +759,7 @@ class CMSAPI (object):
     comps = temp_comps
 
     for comp in comps:
-      self.net.makeTerms(comp, term='gterm')
+      self.net.makeTerm(comp, term='gterm', **kwargs)
 
   def x11 (self, comp, cmd_list=[]):
     """

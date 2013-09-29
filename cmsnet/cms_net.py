@@ -52,7 +52,7 @@ The basic naming scheme is as follows:
     Host nodes are named h1-hN
     Switch nodes are named s1-sN
     Controller nodes are named c0-cN
-    Interfaces are named {nodename}-eth0 .. {nodename}-ethN
+    Interfaces are named {nodename}-0 .. {nodename}-N
 
 Note: If the network topology is created using mininet.topo, then
 node numbers are unique among hosts and switches (e.g. we have
@@ -94,12 +94,12 @@ from time import sleep
 from itertools import chain
 
 from mininet.cli import CLI
-from mininet.log import info, warn, error, debug, output
-from mininet.node import Host, Switch#, Dummy, POXNormalSwitch  # Uncomment !!
-from mininet.link import Link, Intf
+from mininet.log import info, warn, error, debug, output       # Uncomment !!
+from mininet.node import Host, Switch#, Dummy, POXNormalSwitch, POXNGSwitch
+#from mininet.link import Link, Intf
 from mininet.util import quietRun, fixLimits, numCores, ensureRoot, moveIntf
 from mininet.util import macColonHex, ipStr, ipParse, netParse, ipAdd
-from mininet.term import cleanUpScreens, makeTerms
+from mininet.term import cleanUpScreens, makeTerm, tunnelX11
 #from mininet.net import Mininet    # Uncomment later!!!
 
 from cmsnet.cms_comp import CMSComponent, VirtualMachine, Hypervisor
@@ -107,6 +107,7 @@ from cmsnet.cms_log import config_error
 import sys
 import random
 import socket
+import time
 from cmsnet.cms_util import defaultDecoder, jsonprint, jsondumps
 from cmsnet.cms_util import makeDirNoErrors, removeNoErrors, resolvePath
 
@@ -116,7 +117,7 @@ import cmsnet.cms_comp
 import cmsnet.cms_topo
 
 # Patching. REMOVE AFTER CHANGES TO MININET AND UNCOMMENT ABOVE EDIT.
-from cmsnet.mininet_node_patch import Dummy, POXNormalSwitch
+from cmsnet.mininet_node_patch import Dummy, POXNormalSwitch, POXNGSwitch
 from cmsnet.mininet_net_patch import MininetPatch as Mininet
 import cmsnet.mininet_net_patch
 
@@ -155,6 +156,7 @@ class CMSnet( object ):
 
         self.echo_timer = None # Timer that sends echo over CMS channel
 
+        self.cmsnet_stopped = False
         self._allow_write_net_config = False
         self._verbose_script_folder_setup = False
         self.cmsnet_info = {}
@@ -179,8 +181,8 @@ class CMSnet( object ):
         self.nameToComp = {}   # name to CMSComponent (VM/HV) objects
         self.controller_socket = None
 
-        self.possible_modes = CMSnet.getPossibleVMDistModes()
-        self.possible_levels = CMSnet.getPossibleCMSMsgLevels()
+        self.possible_modes = self.getPossibleVMDistModes()
+        self.possible_levels = self.getPossibleCMSMsgLevels()
         self.setupPossibleScripts()
 
         self.last_hv = None
@@ -327,15 +329,15 @@ class CMSnet( object ):
         "Start Mininet, hypervisors, and a connection to the controller."
         self.lock_net_config()
         self.mn.start()
-        self.get_hypervisors()
-        if not self.new_config:
-            err1 = self.get_old_mode_params()
-            err2 = self.get_old_VMs()
-            if err1 or err2:
-                self.stop()
-                error("Stopping CMSnet. Please manually fix config.\n")
-                import sys
-                sys.exit(1)
+        (err1, err2, err3) = (None, None, None)
+        err1 = self.get_hypervisors()
+        if not err1 and not self.new_config:
+            err2 = self.get_old_mode_params()
+            err3 = self.get_old_VMs()
+        if err1 or err2 or err3:
+            self.stop()
+            error("Stopping CMSnet. Please manually fix config.\n")
+            sys.exit(1)
         self.setup_controller_connection()
         self.unlock_net_config()
         self.set_echo_timer()
@@ -346,6 +348,8 @@ class CMSnet( object ):
 
     def stop( self ):
         "Stop Mininet, VMs, and the connection to the controller."
+        if self.cmsnet_stopped:
+            return
         if self.echo_timer:
             self.echo_timer.cancel()
         self.lock_net_config()
@@ -355,6 +359,7 @@ class CMSnet( object ):
             vm.shutdown()
         self.mn.stop()
         self.unlock_net_config()
+        self.cmsnet_stopped = True
 
     def run( self, test, *args, **kwargs ):
         "Perform a complete start/test/stop cycle."
@@ -510,15 +515,25 @@ class CMSnet( object ):
     def get_hypervisors( self ):
         "Collect all hypervisors."
         # HV don't need loading. Just attach to switch.
+        err = False
         for node_name in self.mn.nameToNode:
             node = self.mn.nameToNode[node_name]
-            if node.params.get("cms_type") == "hypervisor":
-                hv = self.hv_cls(node, self.cmsnet_info)
-                self.HVs.append(hv)
-                self.nameToComp[ node_name ] = hv
-                # If hv still needs config resuming:
-                #    hv.lock_comp_config()
-                #    hv.unlock_comp_config()
+            try:
+                if node.params.get("cms_type") == "hypervisor":
+                    hv = self.hv_cls(node, self.cmsnet_info)
+                    self.HVs.append(hv)
+                    self.nameToComp[ node_name ] = hv
+                    # If hv still needs config resuming:
+                    #    hv.lock_comp_config()
+                    #    hv.unlock_comp_config()
+                    if hv.name == "host":
+                        error("Hypervisor name cannot be 'host'.\n")
+                        err = True
+            except Exception,e:
+                error_args = (node_name, str(e))
+                error("Error binding %s as hypervisor: %s\n" % error_args)
+                err = True
+        return err
 
     def get_old_mode_params( self ):
         "Extract old configuration parameters for VM distribution modes."
@@ -553,6 +568,71 @@ class CMSnet( object ):
             error("\nError occurred when getting vm_dist_mode parameters!\n")
         return err
 
+    def _reload_old_VM( self, vm_name, err=False ):
+        "Reload vm from vm_name."
+        if vm_name in self.mn.nameToNode:
+            error("Conflict in node name %s.\n" % (vm_name,))
+            return True
+        vm = None
+        try:
+            vm = self.createVM(vm_name)
+        except Exception,e:
+            error("Cannot create %s: %s\n" % (vm_name, str(e)))
+        if vm is None:
+            error("VM %s cannot be created!\n" % (vm_name,))
+            return True
+        vm.lock_comp_config()
+        if vm.config_hv_name:
+            hv_name = vm.config_hv_name
+            hv = self.nameToComp.get(hv_name)
+            if not hv:
+                error_msg = "%s does not exist." % (hv_name,)
+                error("Cannot run %s: %s\n" % (vm, error_msg))
+            elif not isinstance(hv, Hypervisor):
+                error_msg = "%s is not a hypervisor." % (hv,)
+                error("Cannot run %s: %s\n" % (vm, error_msg))
+            elif not hv.is_enabled():
+                error_msg = "%s is not enabled." % (hv,)
+                error("Cannot run %s: %s\n" % (vm, error_msg))
+            else:
+                try:
+                    self.launchVM(vm, hv)
+                except Exception,e:
+                    error("Cannot run %s: %s\n" % (vm, str(e)))
+            if not vm.is_running():
+                error("VM %s not launched!\n" % (vm,))
+                return True
+        if vm.config_is_paused:
+            try:
+                self.pauseVM(vm)
+            except Exception,e:
+                error("Cannot pause %s: %s\n" % (vm, str(e)))
+            if not vm.is_paused():
+                error("VM %s not paused!\n" % (vm,))
+                return True
+        vm.unlock_comp_config()   # This VM is successfully reloaded.
+        return err
+
+    def _liststat_old_VMs( self ):
+        "List statistics of old VMs that were reloaded."
+        launched = []
+        paused = []
+        info("\n")
+        info("*** Resumed %i VMs:\n" % len(self.VMs))
+        for vm in self.VMs:
+            info("%s " % (vm,))
+            if vm.is_running(): launched.append(vm)
+            if vm.is_paused():  paused.append(vm)
+        info("\n")
+        info("*** Relaunched %i VMs:\n" % len(launched))
+        for vm in launched:
+            info("%s " % (vm,))
+        info("\n")
+        info("*** Repaused %i VMs:\n" % len(paused))
+        for vm in paused:
+            info("%s " % (vm,))
+        info("\n")
+
     def get_old_VMs( self ):
         "Collect all previously saved VMs."
         # I want to use glob here instead...
@@ -573,50 +653,11 @@ class CMSnet( object ):
         for file_name in config_files:
             if file_name.endswith(vm_config_suffix):
                 vm_name = file_name[:-len(vm_config_suffix)]
-                vm = self.createVM(vm_name)
-                vm.lock_comp_config()
-                if vm.config_hv_name:
-                    hv = self.nameToComp.get(vm.config_hv_name)
-                    if not hv:
-                        error_msg = "%s does not exist." % vm.config_hv_name
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    elif not isinstance(hv, Hypervisor):
-                        error_msg = "%s is not a hypervisor." % hv
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    elif not hv.is_enabled():
-                        error_msg = "%s is not enabled." % hv
-                        error("Cannot run %s: %s\n" % (vm, error_msg))
-                    else:
-                        self.launchVM(vm, hv)
-                    if not vm.is_running():
-                        error("VM %s is not launched!\n" % vm)
-                        err = True
-                    else:
-                        if vm.config_is_paused:
-                            self.pauseVM(vm)
-                            if not vm.is_paused():
-                                error("VM %s is not paused!\n" % vm)
-                                err = True
-                vm.unlock_comp_config()
+                err = self._reload_old_VM(vm_name, err)
         if err:
             error("\nError occurred when resuming VMs!\n")
         else:
-            launched = []
-            paused = []
-            info("\n*** Resumed %i VMs:\n" % len(self.VMs))
-            for vm in self.VMs:
-                info("%s " % vm)
-                if vm.is_running(): launched.append(vm)
-                if vm.is_paused():  paused.append(vm)
-            info("\n")
-            info("*** Relaunched %i VMs:\n" % len(launched))
-            for vm in launched:
-                info("%s " % vm)
-            info("\n")
-            info("*** Repaused %i VMs:\n" % len(paused))
-            for vm in paused:
-                info("%s " % vm)
-            info("\n")
+            self._liststat_old_VMs()
         self.last_hv = orig_last_hv
         self.debug_flag1 = orig_debug_flag1
         self.mn.debug_flag1 = orig_mn_debug_flag1
@@ -714,12 +755,44 @@ class CMSnet( object ):
                     self.close_controller_connection()
                     self.setup_controller_connection()
 
-    def makeTerms( self, comp, term='xterm' ):
+    def makeTerm( self, comp, term='xterm', oldmake=False ):
         "Spawn terminals for the given component."
-        new_terms = makeTerms( [ comp.node ], term=term )
+        node = comp.node
+        new_terms = []
+        new_term_pids = []
+
+        if oldmake:
+            new_terms = makeTerm( node, term=term )
+        else:
+            title = 'Node'
+            title += ': ' + node.name
+            if not node.inNamespace:
+                title += ' (root)'
+            title = '"%s"' % title
+            cmds = {
+                'xterm': [ 'xterm', '-title', title, '-display' ],
+                'gterm': [ 'gnome-terminal', '--title', title, '--display' ]
+            }
+            if term not in cmds:
+                error( 'invalid terminal type: %s\n' % term )
+                return
+            display, tunnel = tunnelX11( node )
+            if display is None:
+                return
+
+            time.sleep(0.3)
+            cmdarray = cmds[ term ] + [ display, '-e', '"env TERM=ansi bash"' ]
+            err = node.cmd(" ".join(cmdarray) + " &")
+            new_terms = [ tunnel ]
+            if not err:
+                new_term_pids = [ node.lastPid ]
+            else:
+                error(err+"\n")
+
         self.mn.terms += new_terms
         if isinstance(comp, VirtualMachine):
             comp.terms += new_terms
+            comp.term_pids += new_term_pids
 
     def makeX11( self, comp, cmd ):
         "Create an X11 tunnel for the given component."
@@ -750,7 +823,7 @@ class CMSnet( object ):
         self._verbose_script_folder_setup = True
         if self.script_folder is not None:
             return      # Already successfully setup.
-        for pypath in sys.path:        
+        for pypath in sys.path:
             try:
                 if not pypath: pypath = "."
                 self.script_folder = resolvePath(pypath, "cmsnet")
@@ -781,6 +854,12 @@ class CMSnet( object ):
         if self.mn.built:
             error("Cannot add switch; Mininet already built.")
             return
+        if len(name) > 13:
+            error_msg = "Switch name %s exceeds maximum length of 13." % name
+            error("Cannot build network: %s\n" % error_msg)
+            self.stop()
+            error("Stopping CMSnet. Please manually fix setup.\n")
+            sys.exit(1)
         params.update({"cms_type": "hypervisor"})
         return self.mn.addSwitch(name, cls=cls, **params)
 
@@ -793,6 +872,12 @@ class CMSnet( object ):
         if self.mn.built:
             error("Cannot add switch; Mininet already built.")
             return
+        if len(name) > 13:
+            error_msg = "Switch name %s exceeds maximum length of 13." % name
+            error("Cannot build network: %s\n" % error_msg)
+            self.stop()
+            error("Stopping CMSnet. Please manually fix setup.\n")
+            sys.exit(1)
         params.update({"cms_type": "fabric", "cls": POXNormalSwitch})
         return self.mn.addSwitch(name, **params)
 
@@ -938,6 +1023,8 @@ class CMSnet( object ):
         assert not vm_cls or issubclass(vm_cls, VirtualMachine)
 
         host, host_terms = self.mn.createHostAtDummy(vm_name, **params)
+        if host is None:
+            return None
         if not vm_cls:
             vm_cls = self.vm_cls
         vm = vm_cls(host, vm_script, self.cmsnet_info)
@@ -971,6 +1058,8 @@ class CMSnet( object ):
         params['inNamespace'] = old_vm.node.inNamespace
 
         new_vm = self.createVM(new_vm_name, vm_script, vm_cls, **params)
+        if new_vm is None:
+            return None
         assert isinstance(new_vm, VirtualMachine)
         old_vm.cloneTo(new_vm)     # Leave complexity in here.
 
@@ -1266,3 +1355,92 @@ class CMSnet( object ):
         for vm in hv.nameToVMs.values():
             self.stopVM(vm)
         hv.disable()
+
+    def resetHV( self, hv, NGSwitches=True ):
+        "Reset a specific hv."
+        # Stopping or pausing VMs on HV
+        if NGSwitches:
+            if isinstance(hv.node, POXNGSwitch):
+                hv.node._kill_pox_switch()
+                hv.node._run_pox_switch()
+                #hv.node.start(self.mn.controllers)
+                info("Reset POXNGSwitch %s.\n" % hv.name)
+                return
+            error("%s is not a POXNGSwitch.\n" % hv.name)
+            return
+
+        running_vms = []
+        for vm in hv.nameToVMs.values():
+            assert vm.is_running()
+            if not vm.is_paused():
+                self.pauseVM(vm)
+                running_vms.append(vm)
+
+        # Obtain underlying HV and fabric switch nodes and intfs info
+        # Note: We assume that HV have a unique default interface to fabric.
+        hvnode = hv.node
+        hvintf = hvnode.intfs[1]
+        # Note: hv.node.intf() doesn't work since switch.defaultIntf = lo.
+        assert hvintf is not None
+        hvintf_name = hvintf.name
+        hvintf_port = hvnode.ports[hvintf]
+        assert hvintf.link is not None
+        assert hvintf in [hvintf.link.intf1, hvintf.link.intf2]
+        if hvintf == hvintf.link.intf1:
+            fabricintf = hvintf.link.intf2
+        elif hvintf == hvintf.link.intf2:
+            fabricintf = hvintf.link.intf1
+        fabricnode = fabricintf.node
+        fabricintf_name = fabricintf.name
+        fabricintf_port = fabricnode.ports[fabricintf]
+
+        # Detach interfaces and stop hv switch, then delete from tables
+        fabricnode.detach(fabricintf)
+        hvnode.detach(hvintf)
+        hvnode.stop()
+        # Note: This part is added because Mininet doesn't do this cleanup.
+        del hvnode.intfs[hvintf_port]
+        del hvnode.ports[hvintf]
+        del hvnode.nameToIntf[hvintf_name]
+        del fabricnode.intfs[fabricintf_port]
+        del fabricnode.ports[fabricintf]
+        del fabricnode.nameToIntf[fabricintf_name]
+
+        # Restart link, attach interfaces, and restart the switch.
+        self.mn.addLink(hvnode, fabricnode)
+        new_hvintf = hvnode.intfs[1]
+        # Note: hv.node.intf() doesn't work since switch.defaultIntf = lo.
+        # Note: It may be better to refactor this later.
+        assert new_hvintf is not None
+        assert new_hvintf.link is not None
+        assert new_hvintf in [new_hvintf.link.intf1, new_hvintf.link.intf2]
+        if new_hvintf == new_hvintf.link.intf1:
+            new_fabricintf = new_hvintf.link.intf2
+        elif new_hvintf == new_hvintf.link.intf2:
+            new_fabricintf = new_hvintf.link.intf1
+        assert new_fabricintf.node == fabricnode
+        hvnode.attach(new_hvintf)
+        fabricnode.attach(new_fabricintf)
+        hvnode.start(self.mn.controllers)
+
+        # Return status of VMs
+        for vm in running_vms:
+            self.resumeVM(vm)
+
+        # Actively send sync (is this necessary? I guess, to set rules.)
+        self.send_sync()
+        info("Reset %s %s.\n" % (hv.__class__.__name__, hv.name))
+
+    def resetAllHVs( self, NGSwitches=True ):
+        "Reset all hvs."
+        if NGSwitches:
+            ng_switches = []
+            for hv in self.HVs:
+                if isinstance(hv.node, POXNGSwitch):
+                    hv.node._kill_pox_switch()
+                    hv.node._run_pox_switch()
+                    ng_switches.append(hv.name)
+            info("Reset all POXNGSwitches: %s\n" % " ".join(ng_switches))
+            return
+        for hv in self.HVs:
+            self.resetHV(hv, NGSwitches=False)

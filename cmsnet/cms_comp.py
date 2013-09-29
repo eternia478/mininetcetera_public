@@ -25,11 +25,12 @@ from time import sleep
 from mininet.util import ( quietRun, errRun, errFail, moveIntf, isShellBuiltin,
                            numCores, retry, mountCgroups )
 from mininet.moduledeps import moduleDeps, pathCheck, OVS_KMOD, OF_KMOD, TUN
-from mininet.link import Link, Intf, TCIntf
+#from mininet.link import Link, Intf, TCIntf
 from mininet.node import Node, Host, Switch
 
 from cmsnet.cms_log import error, info, output, warn, debug, config_error
 import shutil
+import traceback
 from cmsnet.cms_util import ( defaultDecoder, jsonprint, jsondumps,
                               makeDirNoErrors, removeNoErrors,
                               isValidMAC, getExpandedIP, isValidIP,
@@ -238,6 +239,7 @@ class VirtualMachine( CMSComponent ):
         self.config_hv_name = None   # temp holder for HV name in config
         self.config_is_paused = None # temp holder for paused status in config
         self.terms = []              # temp holder for terms to kill on removal
+        self.term_pids = []          # temp holder for term pids to kill
 
         #self.reload_temp_folder()
         self.create_temp_folder()
@@ -245,7 +247,6 @@ class VirtualMachine( CMSComponent ):
         self.check_comp_config()
         self.update_comp_config()
         self.unlock_comp_config()
-        self.IP = self.IP            # Check attribute values again.
 
     @CMSComponent.name.setter
     def name( self, name ):
@@ -297,8 +298,8 @@ class VirtualMachine( CMSComponent ):
             self.node.setMAC(oldmac)
         else:
             self.update_comp_config()
-        if self.default_gateway:                         # Re-set table.
-            self.default_gateway = self.default_gateway
+        if self.gateway:                         # Re-set table.
+            self.gateway = self.gateway
 
     @property
     def IP( self ):
@@ -322,9 +323,8 @@ class VirtualMachine( CMSComponent ):
             self.node.setIP(oldip, prefixLen=oldpl)
         else:
             self.update_comp_config()
-        if self.default_gateway:                         # Re-set table.
-            self.default_gateway = self.default_gateway
-
+        if self.gateway:                         # Re-set table.
+            self.gateway = self.gateway
 
     @property
     def prefixLen( self ):
@@ -357,7 +357,15 @@ class VirtualMachine( CMSComponent ):
         self.prefixLen = getPrefixLenFromNetmask(netmask)
 
     @property
-    def default_gateway( self ):
+    def subnet_mask( self ):
+        return self.netmask
+
+    @subnet_mask.setter
+    def subnet_mask( self, subnet_mask ):
+        self.netmask = subnet_mask
+
+    @property
+    def gateway( self ):
         try:
             default_route = self.node.params['defaultRoute']
             default_route_params = default_route.split()
@@ -366,29 +374,38 @@ class VirtualMachine( CMSComponent ):
         except:
             return None
 
-    @default_gateway.setter
-    def default_gateway( self, default_gateway ):
-        if default_gateway is None:
+    @gateway.setter
+    def gateway( self, gateway ):
+        is_setting_up = self.is_comp_config_locked() and self.gateway is None
+        if gateway is None:
             self.node.cmd( 'ip route del default' )
             self.node.params['defaultRoute'] = None
             self.update_comp_config()
             return
-        elif not isValidIP(default_gateway):
-            error(self, "'%s' is not a valid IPv4 address."%(default_gateway,))
+        elif not isValidIP(gateway):
+            error(self, "'%s' is not a valid IPv4 address." % (gateway,))
             return
-        elif not isInSameSubnet(default_gateway, self.IP, self.netmask):
-            msg_args = (default_gateway, "%s/%s" % (self.IP, self.prefixLen))
-            if not self.is_comp_config_locked():
+        elif not isInSameSubnet(gateway, self.IP, self.netmask):
+            msg_args = (gateway, "%s/%s" % (self.IP, self.prefixLen))
+            if not is_setting_up:
                 warn(self, "Gateway '%s' not in same subnet as %s." % msg_args)
-        default_route = "dev %s via %s" % (self.node.intf(), default_gateway)
+        default_route = "dev %s via %s" % (self.node.intf(), gateway)
         err = self.node.setDefaultRoute(intf=default_route)
-        if err and not self.is_comp_config_locked():
+        if err and not is_setting_up:
             error(self, err)
-            olddr = "dev %s via %s" % (self.node.intf(), self.default_gateway)
+            olddr = "dev %s via %s" % (self.node.intf(), self.gateway)
             self.node.setDefaultRoute(intf=olddr)
         else:
             self.node.params['defaultRoute'] = default_route
             self.update_comp_config()
+
+    @property
+    def default_gateway( self ):
+        return self.gateway
+
+    @default_gateway.setter
+    def default_gateway( self, default_gateway ):
+        self.gateway = default_gateway
 
     @property
     def hv( self ):
@@ -447,7 +464,7 @@ class VirtualMachine( CMSComponent ):
           'mac_addr'        : self.MAC,
           'ip_addr'         : self.IP,
           'netmask'         : self.netmask,
-          'default_gateway' : self.default_gateway,
+          'gateway'         : self.gateway,
           'hv_dpid'         : self.hv_dpid,
           'hv_port_to_vm'   : self.hv_port_to_vm,
         }
@@ -468,7 +485,7 @@ class VirtualMachine( CMSComponent ):
         config["MAC"] = self.MAC
         config["IP"] = self.IP
         config["netmask"] = self.netmask
-        config["default_gateway"] = self.default_gateway
+        config["gateway"] = self.gateway
         config["config_hv_name"] = self.hv_name
         config["config_is_paused"] = self.is_paused()
 
@@ -511,7 +528,7 @@ class VirtualMachine( CMSComponent ):
           'MAC'             : self.MAC,
           'IP'              : self.IP,
           'NETMASK'         : self.netmask,
-          'DEFAULT_GATEWAY' : self.default_gateway, 
+          'GATEWAY'         : self.gateway,
         }
         default_params.update(self.vm_script_params)
         return default_params
@@ -537,6 +554,8 @@ class VirtualMachine( CMSComponent ):
         check_script_name = self.get_vm_script_cmd(script_type="check")
         script_name = self.get_vm_script_cmd(script_type=script_type)
         self.write_rc_file()
+        for config_file in [".Xauthority", ".bashrc", ".profile"]:
+            self.node.cmd("cp ~/{1} {0}".format(temp_path, config_file))
 
         init_cmd = "cd {0} && source .cmsnetrc && [ -x \"{1}\" ] && {1}"
         cmd = "{1} >> {0}/log.out 2>> {0}/log.err &"
@@ -611,7 +630,11 @@ class VirtualMachine( CMSComponent ):
         if not self.is_running():
             return
         self.lock_comp_config()    # Prevent adjustments to config file.
-        self.stop()
+        self.node.waiting = False  # Prevent any assertion errors.
+        try:
+            self.stop()
+        except:
+            error( traceback.format_exc() + "\n" )
         # self.store_temp_folder()
 
 
@@ -674,7 +697,7 @@ class Hypervisor( CMSComponent ):
         info = {
           'name'         : self.name,
           'dpid'         : self.dpid,
-          'fabric_ports' : [self.name+"-eth1"],
+          'fabric_ports' : [self.name+"-1"],
         }
         return info
 

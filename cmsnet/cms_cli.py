@@ -31,6 +31,7 @@ from select import poll, POLLIN
 import sys
 import time
 
+from mininet.cli import CLI as MininetCLI
 from mininet.log import info, output, error
 from mininet.term import makeTerms, runX11
 from mininet.util import quietRun, isShellBuiltin, dumpNodeConnections
@@ -529,10 +530,14 @@ class CMSCLI( Cmd ):
         vm_name = None
         script_arg = None
         script_val = None
-        attr_list = ["MAC", "IP", "netmask", "default_gateway", "vm_script"]
+        attr_list = ["MAC", "IP", "netmask", "gateway", "vm_script"]
         attr_alias = { 
-            "NETMASK" : "netmask",
-            "DEFAULT_GATEWAY" : "default_gateway",
+            "NETMASK"         : "netmask",
+            "subnet_mask"     : "netmask",
+            "SUBNET_MASK"     : "netmask",
+            "GATEWAY"         : "gateway",
+            "default_gateway" : "gateway",
+            "DEFAULT_GATEWAY" : "gateway",
         }
 
         if len(args) == 2:
@@ -573,10 +578,14 @@ class CMSCLI( Cmd ):
         args = line.split()
         vm_name = None
         script_arg = None
-        attr_list = ["MAC", "IP", "netmask", "default_gateway", "vm_script"]
+        attr_list = ["MAC", "IP", "netmask", "gateway", "vm_script"]
         attr_alias = { 
-            "NETMASK" : "netmask",
-            "DEFAULT_GATEWAY" : "default_gateway",
+            "NETMASK"         : "netmask",
+            "subnet_mask"     : "netmask",
+            "SUBNET_MASK"     : "netmask",
+            "GATEWAY"         : "gateway",
+            "default_gateway" : "gateway",
+            "DEFAULT_GATEWAY" : "gateway",
         }
 
         if len(args) == 2:
@@ -766,7 +775,22 @@ class CMSCLI( Cmd ):
 
         self.cn.autoexec_script = autoexec_script
 
+    def do_mininet( self, line, cmd_name="mininet" ):
+        "Run the Mininet CLI."
+        args = line.split()
 
+        if len(args) != 0:
+            usage = '%s' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        try:
+            info("Entering Mininet layer.\n")
+            MininetCLI(self.cn.mn)
+        except:
+            pass
+        finally:
+            info("Exited from Mininet layer. Returning to CMSnet.\n")
 
 
 
@@ -879,6 +903,27 @@ class CMSCLI( Cmd ):
 
         if not err:
             self.cn.killHV(hv)
+            
+    def do_reset( self, line, cmd_name='reset' ):
+        "Reset a hypervisor."
+        args = line.split()
+        hv_name = None
+
+        if len(args) == 1:
+            hv_name = args[0]
+        else:
+            usage = '%s hv_name|all' % cmd_name
+            error('invalid number of args: %s\n' % usage)
+            return
+
+        if hv_name == "all":
+            self.cn.resetAllHVs()
+            return
+
+        err, hv = self._check_hv_name(hv_name)
+
+        if not err:
+            self.cn.resetHV(hv)
 
 
 
@@ -1090,7 +1135,7 @@ class CMSCLI( Cmd ):
                     error( "Component '%s' not found.\n" % arg )
                 else:
                     comp = self.cn[ arg ]
-                    self.cn.makeTerms(comp, term=term)
+                    self.cn.makeTerm(comp, term=term)
 
     def do_x( self, line ):
         """Create an X11 tunnel to the given component,

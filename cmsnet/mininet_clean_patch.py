@@ -70,5 +70,10 @@ def cleanup():
     for link in links:
         if link != '':
             sh( "ip link del " + link )
+    info( "*** Removing all links of the pattern foo-X\n" )
+    links = sh( r"ip link show | egrep -o '(\w+-\w+)'" ).split( '\n' )
+    for link in links:
+        if link != '':
+            sh( "ip link del " + link )
 
     info( "*** Cleanup complete.\n" )

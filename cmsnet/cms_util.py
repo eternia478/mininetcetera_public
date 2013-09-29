@@ -7,6 +7,9 @@ import os
 import shutil
 import socket
 import cmsnet.cms_comp
+import subprocess
+import sys
+import signal
 
 
 
@@ -59,9 +62,76 @@ def removeNoErrors( file_path ):
             return False
     return True
 
-def resolvePath( *args ):
+def resolvePath( *rawargs ):
     """Resolve the absolute path given the arguments"""
+    is_abspath = True
+    args = []
+    for p in rawargs:
+        p = p.strip()
+        if is_abspath:
+            if p != "":
+                is_abspath = False
+                args.append(p)
+        else:
+            if p is not None:
+                p = p.strip("/")
+                args.append(p)
     return os.path.abspath(os.path.expanduser(os.path.join("", *args)))
+
+
+
+# Cgroup exiting and cleanup
+
+grpbase = "/sys/fs/cgroup/mininet"
+grpname = "mininet" + str(os.getpid())
+
+def write_or_exit(file_name, content):
+    """Write intended content to file, or exit due to failure."""
+    try:
+        with open(os.path.join(grpbase, file_name), "w") as f:
+            f.write(content)
+            f.flush()
+    except IOError,e:
+        error_msg = "Unable to write to cgroup file "+str(file_name)
+        error("%s: %s\n" % (error_msg, str(e)))
+        sys.exit(1)
+
+def set_cgroup():
+    """Set up Mininet cgroup."""
+    if not makeDirNoErrors(grpbase):
+        sys.exit(1)
+    if not os.listdir(grpbase):
+        cgroup_mount_cmd = "mount -t cgroup -o cpuacct mininet " + grpbase
+        subprocess.call(cgroup_mount_cmd, shell=True)
+        agent = os.path.abspath(os.path.dirname(sys.argv[0]))
+        agent = os.path.join(agent, "cgroup_release_agent")
+        write_or_exit('release_agent', os.path.join(sys.path[0], agent))
+        write_or_exit('notify_on_release', '1')
+        assert os.listdir(grpbase)
+    grpdir = os.path.join(grpbase, grpname)
+    if not makeDirNoErrors(grpdir):
+        sys.exit(1)
+    write_or_exit(os.path.join(grpname, "tasks"), str(os.getpid()))
+
+def kill_cgroup():
+    """Kill off processes forked from Mininet."""
+    pids = []
+    tasksfile = os.path.join(grpbase, grpname, "tasks")
+    try:
+        with open(tasksfile, 'r') as f:
+            pids = f.read().strip().split("\n")
+    except IOError,e:
+        error_msg = "Unable to read from cgroup tasks file"
+        error("%s: %s\n" % (error_msg, str(e)))
+        return
+    pids = [int(p) for p in pids if int(p) != os.getpid()]
+    #print pids
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except Exception,e:
+            error_msg = "Unable to kill pid "+str(pid)
+            error("%s: %s\n" % (error_msg, str(e)))
 
 
 

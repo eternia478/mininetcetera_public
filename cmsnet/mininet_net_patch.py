@@ -3,13 +3,14 @@ from mininet.log import info, error, debug, warn
 from mininet.node import Host
 from mininet.term import cleanUpScreens, makeTerms
 import os
+import signal
 
 
 
 # REMEMBER TO ALSO IMPORT THESE IN MININET LATER:
 from mininet.util import moveIntf
 from mininet.node import Switch#, Dummy
-
+import traceback
 
 # Patching. REMOVE AFTER CHANGES TO MININET AND UNCOMMENT ABOVE EDIT.
 from cmsnet.mininet_node_patch import Dummy
@@ -54,6 +55,22 @@ class MininetPatch(Mininet):
         #--------------------------------------------------------------------
 
         Mininet.__init__( self, *args, **kwargs )
+
+
+    def __iter__( self ):
+        "return iterator over nodes"
+        #or dow we want to iterate of the keys i.e. node.name like a dict
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+        for node in self.nameToNode.values():
+            yield node.name
+        #--------------------------------------------------------------------
+
+
+    def __len__( self ):
+        "returns number of nodes in net"
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+        return len(self.nameToNode)
+        #--------------------------------------------------------------------
 
 
     def buildFromTopo( self, topo=None ):
@@ -120,6 +137,21 @@ class MininetPatch(Mininet):
         self.terms += makeTerms( self.hosts, 'host' )
 
 
+    def stopXterms( self ):
+        "Kill each xterm."
+        for term in self.terms:
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+            try:
+                os.kill( term.pid, signal.SIGKILL )
+            except:
+                error( traceback.format_exc() + "\n" )
+        #--------------------------------------------------------------------
+        #---------------------------------------------THIS NEEDS TO BE ADDED!
+        self.terms = []
+        #--------------------------------------------------------------------
+        cleanUpScreens()
+
+
     def stop( self ):
         "Stop the controller(s), switches and hosts"
         if self.terms:
@@ -128,23 +160,41 @@ class MininetPatch(Mininet):
         info( '*** Stopping %i switches\n' % len( self.switches ) )
         for switch in self.switches:
             info( switch.name + ' ' )
-            switch.stop()
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+            try:
+                switch.stop()
+            except:
+                error( traceback.format_exc() + "\n" )
+        #--------------------------------------------------------------------
         info( '\n' )
         info( '*** Stopping %i hosts\n' % len( self.hosts ) )
         for host in self.hosts:
             info( host.name + ' ' )
-            host.terminate()
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+            try:
+                host.terminate()
+            except:
+                error( traceback.format_exc() + "\n" )
+        #--------------------------------------------------------------------
         info( '\n' )
         info( '*** Stopping %i controllers\n' % len( self.controllers ) )
         for controller in self.controllers:
             info( controller.name + ' ' )
-            controller.stop()
+        #---------------------------------------------THIS NEEDS TO BE CHANGED!
+            try:
+                controller.stop()
+            except:
+                error( traceback.format_exc() + "\n" )
+        #--------------------------------------------------------------------
         #---------------------------------------------THIS NEEDS TO BE ADDED!
         info( '\n' )
         info( '*** Stopping %i dummies\n' % len( self.dummies ) )
         for dummy in self.dummies:
             info( dummy.name + ' ' )
-            dummy.terminate()
+            try:
+                dummy.terminate()
+            except:
+                error( traceback.format_exc() + "\n" )
         #--------------------------------------------------------------------
         info( '\n*** Done\n' )
 
@@ -224,6 +274,13 @@ class MininetPatch(Mininet):
             error('dummy node does not exist\n')
             return
         assert isinstance(dummy, Dummy)
+        
+        # Part 2: Check host name.
+        if "inNamespace" in params and not params.get("inNamespace"):
+            if len(hostName) > 13:
+                error_msg = "Name of host %s using public namespace" % name
+                error_msg += " exceeds maximum length of 13."
+                return None, host_terms
 
         # The following corresponds to code in self.build()
 
@@ -235,8 +292,10 @@ class MininetPatch(Mininet):
         if self.debug_flag1:
             info( '*** Adding link: (%s, %s)\n' % ( host.name, dummy.name ) )
         hostPort = host.newPort()
-        dummyPort = dummy.newPort()
-        self.addLink( host, dummy, hostPort, dummyPort )
+        hostIntfName = "host-"+repr(hostPort)
+        if not host.inNamespace:
+            hostIntfName = None     # Use default interface name.
+        self.addLink( host, dummy, port1=hostPort, intfName1=hostIntfName )
 
         # if ( self.inNamespace ):
         #     self.configureControlNetwork()
@@ -332,7 +391,8 @@ class MininetPatch(Mininet):
         intf2_port = node2.newPort()          # For now, just assign new port.
         intf2 = intf1_other
         if not intf2_name:
-            intf2_name = "%s-eth%d" % (node2.name, intf2_port)
+            assert intf2.link != None
+            intf2_name = intf2.link.intfName(node2, intf2_port)
         intf2.rename(intf2_name)
         intf2.node = node2
         node2.intfs[ intf2_port ] = intf2
@@ -388,7 +448,7 @@ class MininetPatch(Mininet):
 
         # Part 2: Extracting dummy information and calling moveLink().
         dummy_intf_port = dummy.newPort()
-        dummy_intf_name = 'dummy-eth' + str(dummy_intf_port)
+        dummy_intf_name = intf.link.intfName(dummy, dummy_intf_port)
         self.moveLink(node, dummy, intf_name, dummy_intf_name)
 
     def swapLink( self, node1, node2, intf1_name=None, intf2_name=None ):

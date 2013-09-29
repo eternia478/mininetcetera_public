@@ -29,7 +29,7 @@ from mininet.net import Mininet, MininetWithControlNet, VERSION
 from mininet.node import ( Host, CPULimitedHost, Controller, OVSController,
                            NOX, RemoteController, UserSwitch, OVSKernelSwitch,
                            OVSLegacyKernelSwitch, IVSSwitch )
-from mininet.link import Link, TCLink
+#from mininet.link import Link, TCLink
 #from mininet.topo import SingleSwitchTopo, LinearTopo, SingleSwitchReversedTopo
 #from mininet.topolib import TreeTopo
 from mininet.util import custom, customConstructor
@@ -44,6 +44,7 @@ from cmsnet.mininet_clean_patch import cleanup
 from cmsnet.mininet_net_patch import MininetPatch
 from cmsnet.mininet_node_patch import POXSwitch, POXNormalSwitch, POXNGSwitch
 from cmsnet.mininet_node_patch import Dummy, PlainSwitch
+from cmsnet.mininet_link_patch import Link, TCLink
 
 
 import subprocess
