@@ -466,4 +466,7 @@ class POXNormalSwitch( POXSwitch ):
     def __init__( self, name, **params):
         params.update({"inNamespace":True})
         POXSwitch.__init__(self, name, control_flag=True,
-                           control_type="forwarding.hub", **params)
+                           control_type="forwarding.hub",
+                           address="127.0.0.1",
+                           port=6639,
+                           **params)
